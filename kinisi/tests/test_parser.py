@@ -4,7 +4,7 @@ Tests for parser module
 
 # Copyright (c) kinisi developers.
 # Distributed under the terms of the MIT License
-# author: Andrew R. McCluskey (arm61)
+# author: Andrew R. McCluskey (arm61) & Josh Dunn (jd15489)
 # pylint: disable=R0201
 
 import unittest
