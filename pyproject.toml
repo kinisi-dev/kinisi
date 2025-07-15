@@ -111,6 +111,11 @@ ignore = ["E501"] # ignore line length violations
 "parser.py" = ["F821"] # unimported modules in type hints
 "mdanalysis.py" = ["F821"] # unimported modules in type hints
 "pymatgen.py" = ["F821"] # unimported modules in type hints
+"ase.py" = ["F821"] # unimported modules in type hints
+"analyzer.py" = ["F821"] # unimported modules in type hints
+"conductivity_analyzer.py" = ["F821"] # unimported modules in type hints
+"diffusion_analyzer.py" = ["F821"] # unimported modules in type hints
+"jump_diffusion_analyzer.py" = ["F821"] # unimported modules in type hints
 
 [tool.ruff.format]
 quote-style = "single"
