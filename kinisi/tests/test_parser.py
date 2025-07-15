@@ -4,7 +4,7 @@ Tests for parser module
 
 # Copyright (c) kinisi developers.
 # Distributed under the terms of the MIT License
-# author: Andrew R. McCluskey (arm61), Oskar G. Soulas (osoulas)
+# author: Andrew R. McCluskey (arm61), Josh Dunn (jd15489) & Oskar G. Soulas (osoulas)
 # pylint: disable=R0201
 
 import unittest
@@ -85,6 +85,76 @@ class TestSubsetApprox(unittest.TestCase):
         subset = np.array([1, 3, 5, 7])
         assert not parser.is_subset_approx(subset, data)
 
+class test_is_orthorhombic(unittest.TestCase):
+    """
+    Unit tests for checking cell shapes.
+    """
+
+    def test_is_orthorhombic(self):
+        latt = np.tile([[1,0,0],
+                        [0,1,0],
+                        [0,0,1]],
+                        (3,1,1))
+        latt = sc.array(dims=['time', 'dimension1', 'dimension2'], values=latt, unit=sc.units.angstrom)
+        assert parser.is_orthorhombic(latt)
+
+    def test_is_orthorhombic_close(self):
+        latt = np.tile([[1,0,0],
+                        [1*np.cos(90*(np.pi/180)), 1*np.sin(90*np.pi/180),0],
+                        [0,0,1]],
+                        (3,1,1))
+        latt = sc.array(dims=['time', 'dimension1', 'dimension2'], values=latt, unit=sc.units.angstrom)
+        assert parser.is_orthorhombic(latt)
+
+    def test_is_not_orthorhombic(self):
+        latt = np.tile([[1,0,0],
+                        [1*np.cos(60*(np.pi/180)),1*np.sin(60*np.pi/180),0],
+                        [0,0,1]],
+                        (3,1,1))
+        latt = sc.array(dims=['time', 'dimension1', 'dimension2'], values=latt, unit=sc.units.angstrom)
+        assert not parser.is_orthorhombic(latt)
+    
+    def test_some_is_not_orthorhombic(self):
+        latt = np.tile([[1,0,0],
+                        [1,1,0],
+                        [0,0,1]],
+                        (3,1,1))
+        latt = np.concatenate((latt,
+                               [[[1,0,0],
+                                 [1*np.cos(60*(np.pi/180)),1*np.sin(60*np.pi/180),0],
+                                 [0,0,1]]]),
+                               axis=0)
+        latt = sc.array(dims=['time', 'dimension1', 'dimension2'], values=latt, unit=sc.units.angstrom)
+        assert not parser.is_orthorhombic(latt)
+
+    def test_orthorhombic_calculate_displacements(self):
+        coords = [[[0.1, 0.1, 0.1]],
+                  [[0.1, 0.1, 0.1]], [[0.9, 0.1, 0.1]],
+                  [[0.1, 0.1, 0.1]], [[0.1, 0.9, 0.1]],
+                  [[0.1, 0.1, 0.1]], [[0.1, 0.1, 0.9]],
+                  [[0.1, 0.1, 0.1]], [[0.9, 0.9, 0.1]],
+                  [[0.1, 0.1, 0.1]], [[0.9, 0.1, 0.9]],
+                  [[0.1, 0.1, 0.1]], [[0.1, 0.9, 0.9]],
+                  [[0.1, 0.1, 0.1]], [[0.9, 0.9, 0.9]]]
+        coords = sc.array(dims=['time','atom','dimension'],
+                          values=coords,
+                          unit=sc.units.dimensionless)
+        latt = np.tile([[10,0,0],[0,10,0],[0,0,10]], (coords.shape[0],1,1))
+        latt = sc.array(dims=['time','dimension1','dimension2'],
+                        values=latt,
+                        unit=sc.units.angstrom)
+        disp = parser.Parser.orthorhombic_calculate_displacements(coords=coords, lattice=latt)
+        test_disp = [[[ 0. ,  0. ,  0. ]],[[-2. ,  0. ,  0. ]],
+                     [[ 2. ,  0. ,  0. ]],[[ 0. , -2. ,  0. ]],
+                     [[ 0. ,  2. ,  0. ]],[[ 0. ,  0. , -2. ]],
+                     [[ 0. ,  0. ,  2. ]],[[-2. , -2. ,  0. ]],
+                     [[ 2. ,  2. ,  0. ]],[[-2. ,  0. , -2. ]],
+                     [[ 2. ,  0. ,  2. ]],[[ 0. , -2. , -2. ]],
+                     [[ 0. ,  2. ,  2. ]],[[-2. , -2. , -2. ]]]
+        test_disp = sc.array(dims=['obs','atom','dimension'],
+                             values=np.cumsum(test_disp, axis=0),
+                             unit=sc.units.angstrom)
+        assert_almost_equal(disp.values, test_disp.values)
 
 dg = sc.io.load_hdf5(os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_drift.h5'))
 coords = dg['coords']

@@ -31,6 +31,15 @@ DIMENSIONALITY = {
     b'xyz': np.s_[:],
 }
 
+# Single letter labels to be used as subscripts for dimensions of scipp arrays in einsums.
+EINSUM_DIMENSIONS = {
+    'time': 't',
+    'atom': 'a',
+    'image': 'i',
+    'row': 'r',
+    'column': 'c',
+}  
+
 
 class Parser:
     """
@@ -66,7 +75,7 @@ class Parser:
         specie_indices: VariableLikeType = None,
         drift_indices: VariableLikeType = None,
         masses: VariableLikeType = None,
-        dimension: str = 'xyz',
+        dimension: str = 'xyz'
     ):
         self.time_step = time_step
         self.step_skip = step_skip
@@ -87,7 +96,11 @@ class Parser:
         self.drift_indices = drift_indices
         self._coords = coords
 
-        disp = self.calculate_displacements(coords, latt)
+        if is_orthorhombic(latt):
+            disp = self.orthorhombic_calculate_displacements(coords, latt)
+        else:
+            disp = self.non_orthorhombic_calculate_displacements(coords, latt)
+        self._disp = disp
         drift_corrected = self.correct_drift(disp)
 
         self._slice = DIMENSIONALITY[dimension.lower()]
@@ -171,9 +184,51 @@ class Parser:
         dt_index = (self.dt / (time_step * step_skip)).astype(int)
         return dt_index
 
-    def calculate_displacements(self, coords: VariableLikeType, lattice: VariableLikeType) -> VariableLikeType:
+    def generate_indices(
+        self,
+        structure: tuple[
+            Union['pymatgen.core.structure.Structure', 'MDAnalysis.core.universe.Universe'],
+            VariableLikeType,
+            VariableLikeType,
+        ],
+        specie_indices: VariableLikeType,
+        coords: VariableLikeType,
+        specie: Union[
+            'pymatgen.core.periodic_table.Element',
+            'pymatgen.core.periodic_table.Specie',
+            'str',
+        ],
+        masses: VariableLikeType,
+    ) -> tuple[VariableLikeType, VariableLikeType]:
         """
-        Calculate the absolute displacements of the atoms in the trajectory.
+        Handle the specie indices and determine the indices for the framework and drift correction.
+
+        :param structure: The initial structure to determine the indices from.
+        :param specie_indices: Indices for the atoms in the trajectory used in the diffusion calculation
+        :param coords: The fractional coordinates of the atoms in the trajectory.
+        :param specie: The specie to calculate the diffusivity for.
+        :param masses: Masses associated with indices in indices. 1D scipp array of dim 'group_of_atoms'
+
+        :return: A tuple containing the indices for the atoms in the trajectory used in the diffusion calculation
+            and indices of framework atoms.
+        """
+        if specie is not None:
+            indices, drift_indices = self.get_indices(structure, specie)
+        elif isinstance(specie_indices, sc.Variable):
+            if len(specie_indices.dims) > 1:
+                coords, indices, drift_indices = get_molecules(structure, coords, specie_indices, masses)
+            else:
+                indices, drift_indices = get_framework(structure, specie_indices)
+        else:
+            raise TypeError('Unrecognized type for specie or specie_indices, specie_indices must be a sc.array')
+        return coords, indices, drift_indices
+
+    @staticmethod
+    def orthorhombic_calculate_displacements(
+        coords: VariableLikeType, lattice: VariableLikeType
+    ) -> VariableLikeType:
+        """
+        Calculate the absolute displacements of the atoms in the trajectory, when the cell is orthorhombic on all frames.
 
         :param coords: The fractional coordiates of the atoms in the trajectory. This should be a :py:mod:`scipp`
             array type object with dimensions of 'atom', 'time', and 'dimension'.
@@ -205,6 +260,40 @@ class Parser:
         unwrapped_diff = wrapped_diff - diff_diff
         return sc.cumsum(unwrapped_diff, 'obs')
 
+    @staticmethod
+    def non_orthorhombic_calculate_displacements(
+        coords: VariableLikeType, lattice: VariableLikeType
+    ) -> VariableLikeType:
+        """
+        Calculate the absolute displacements of the atoms in the trajectory, when a non-orthrhombic cell is used. This is done by finding the minimum cartesian
+            displacement vector, from its 8 periodic images. This ensures that triclinic cells are treated correctly.
+
+        :param coords: The fractional coordiates of the atoms in the trajectory. This should be a :py:mod:`scipp`
+            array type object with dimensions of 'atom', 'time', and 'dimension'.
+        :param lattice: A series of matrices that describe the lattice in each step in the trajectory.
+            A :py:mod:`scipp` array with dimensions of 'time', 'row', and 'column'.
+
+        :return: The absolute displacements of the atoms in the trajectory.
+        """
+        diff = np.diff(coords.values, axis=0)
+        images = np.tile(
+            [[0, 0, 0], [-1, 0, 0], [-1, -1, 0], [0, -1, 0], [0, 0, 1], [-1, 0, 1], [-1, -1, 1], [0, -1, 1]],
+            (diff.shape[0], diff.shape[1], 1, 1),
+        )
+
+        diff[diff < 0] += 1
+        images = images + diff[..., np.newaxis, :]
+
+        cart_images = np.einsum('taid,tdc->taid', images, lattice.values[1:])
+        image_disps = np.linalg.norm(cart_images, axis=-1)
+        min_index = np.argmin(image_disps, axis=-1)
+
+        min_vectors = cart_images[np.arange(images.shape[0])[:, None], np.arange(images.shape[1])[None, :], min_index]
+        min_vectors = sc.array(dims=['obs'] + list(coords.dims[1:]), values=min_vectors, unit=coords.unit)
+        disps = sc.cumsum(min_vectors, 'obs')
+
+        return disps
+
     def correct_drift(self, disp: VariableLikeType) -> VariableLikeType:
         """
         Perform drift correction, such that the displacement is calculated normalised to any framework drift.
@@ -220,11 +309,18 @@ class Parser:
             return disp
 
     @property
-    def coords(self) -> VariableLikeType:
+    def coords(self):
         """
-        :return:  fractional coordinates of the chosen system.
+        Coordinates of 'atoms', this may be the raw coordinates parsed or centres of mass/geometry.
         """
         return self._coords
+
+    @property
+    def disp(self):
+        """
+        Atom displacements, without drift correction.
+        """
+        return self._disp
 
 
 def get_molecules(
@@ -328,3 +424,20 @@ def is_subset_approx(B: np.array, A: np.array, tol: float = 1e-9) -> bool:
     :return: True if all elements in B are approximately equal to any element in A, False otherwise.
     """
     return all(any(abs(a - b) < tol for a in A) for b in B)
+
+
+def is_orthorhombic(latt: VariableLikeType) -> bool:
+    """
+    Check if trajectory is always orthorhombic.
+
+    :param latt: a :py:mod:`scipp` array with dimensions `time`,`dimension1`, and `dimension2`.
+
+    :return: True if lattice vectors are orthorhombic for all trajectory frames.
+    """
+    # This function works by flattening each frames lattice vectors,
+    # then checking which are close to 0, and counting how many return True.
+    # If the cell is orthorhombic, only 3 elements, of 9, should be nonzero, leaving 6.
+    # Hence, count_nonzero should equal 6 on every element to return true.
+    # This does not measure lattice angles and so all vectors must be aligned with axes
+    # to return true.
+    return np.all(np.count_nonzero(np.isclose(latt.values.reshape(-1, 9), 0), axis=-1) == 6)
