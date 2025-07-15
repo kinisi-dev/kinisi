@@ -27,15 +27,15 @@ class TestJumpDiffusionAnalyzer(unittest.TestCase):
         da_params = {'specie': 'Li', 'time_step': 2.0 * sc.Unit('fs'), 'step_skip': 50 * sc.Unit('dimensionless')}
         analyzer = JumpDiffusionAnalyzer._from_xdatcar(xd, **da_params)
         test_file = 'test_save.h5'
-        analyzer._to_hdf5(test_file)
+        analyzer.to_hdf5(test_file)
         file_exists = os.path.exists(test_file)
         os.remove(test_file)
         assert file_exists
 
     def test_load_hdf(cls):
         test_file = os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_DiffusionAnalyzer.h5')
-        analyzer = JumpDiffusionAnalyzer._from_hdf5(test_file)
-        analyzer_2 = Analyzer._from_hdf5(test_file)
+        analyzer = JumpDiffusionAnalyzer.from_hdf5(test_file)
+        analyzer_2 = Analyzer.from_hdf5(test_file)
         assert analyzer.trajectory._to_datagroup() == analyzer_2.trajectory._to_datagroup()
         assert type(analyzer) is type(analyzer_2)
 
@@ -44,9 +44,9 @@ class TestJumpDiffusionAnalyzer(unittest.TestCase):
         da_params = {'specie': 'Li', 'time_step': 2.0 * sc.Unit('fs'), 'step_skip': 50 * sc.Unit('dimensionless')}
         analyzer = JumpDiffusionAnalyzer._from_xdatcar(xd, **da_params)
         test_file = 'test_save.h5'
-        analyzer._to_hdf5(test_file)
-        analyzer_2 = JumpDiffusionAnalyzer._from_hdf5(test_file)
-        analyzer_3 = Analyzer._from_hdf5(test_file)
+        analyzer.to_hdf5(test_file)
+        analyzer_2 = JumpDiffusionAnalyzer.from_hdf5(test_file)
+        analyzer_3 = Analyzer.from_hdf5(test_file)
         if os.path.exists(test_file):
             os.remove(test_file)
         assert analyzer.trajectory._to_datagroup() == analyzer_2.trajectory._to_datagroup()
