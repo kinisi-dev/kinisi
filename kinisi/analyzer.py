@@ -9,9 +9,10 @@ are intended for internal use.
 
 # Copyright (c) kinisi developers.
 # Distributed under the terms of the MIT License.
-# author: Andrew R. McCluskey (arm61) and Harry Richardson (Harry-Rich).
+# author: Andrew R. McCluskey (arm61), Harry Richardson (Harry-Rich) and Oskar G. Soulas (osoulas).
 
 from typing import Union
+import importlib
 
 import numpy as np
 import scipp as sc
@@ -20,6 +21,7 @@ from kinisi.ase import ASEParser
 from kinisi.mdanalysis import MDAnalysisParser
 from kinisi.parser import Parser
 from kinisi.pymatgen import PymatgenParser
+from kinisi.diffusion import Diffusion
 
 
 class Analyzer:
@@ -33,6 +35,53 @@ class Analyzer:
 
     def __init__(self, trajectory: Parser) -> None:
         self.trajectory = trajectory
+
+    def _to_hdf5(self, filename: str) -> None:
+        """
+        Save the :py:class:`Analyzer` object to an HDF5 file.
+
+        :param filename: The name of the file to save the object to.
+        """
+        group = self.__dict__.copy()
+        
+        for key, value in group.items():
+            if key == 'trajectory':
+                group[key] = self.trajectory._to_datagroup(hdf5=True)
+            elif key == 'diff':
+                group[key] = self.diff._to_datagroup()
+            elif value is None:
+                group[key] = sc.scalar(value=np.nan, dtype='float64')
+        group['__class__'] = f"{self.__class__.__module__}.{self.__class__.__name__}"
+        sc.DataGroup(group).save_hdf5(filename)
+    
+    @classmethod
+    def _from_hdf5(cls, filename: str) -> 'Analyzer':
+        """
+        Load the :py:class:`Analyzer` object from an HDF5 file.
+
+        :param filename: The name of the file to load the object from.
+        """
+        datagroup = sc.io.load_hdf5(filename)
+
+        class_path = str(datagroup['__class__'])
+        module_name, class_name = class_path.rsplit('.', 1)
+        module = importlib.import_module(module_name)
+        klass = getattr(module, class_name)
+        
+        obj = klass.__new__(klass)
+
+        for key, value in datagroup.items():
+            if key == 'trajectory':
+                setattr(obj, key, Parser._from_datagroup(value))
+            elif key == 'diff':
+                setattr(obj, key, Diffusion._from_datagroup(value))
+            elif key != '__class__':
+                if type(value) == sc.Variable and value.ndim == 0 and np.isnan(value.value):
+                    setattr(obj, key, None)
+                else:
+                    setattr(obj, key, value)
+
+        return obj
 
     @classmethod
     def _from_xdatcar(
