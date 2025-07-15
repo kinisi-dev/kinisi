@@ -4,18 +4,19 @@ Tests for parser module
 
 # Copyright (c) kinisi developers.
 # Distributed under the terms of the MIT License
-# author: Andrew R. McCluskey (arm61) & Josh Dunn (jd15489)
+# author: Andrew R. McCluskey (arm61), Josh Dunn (jd15489) & Oskar G. Soulas (osoulas)
 # pylint: disable=R0201
 
 import unittest
+import os
 
 import MDAnalysis as mda
 import numpy as np
 import scipp as sc
-from numpy.testing import assert_almost_equal
+from numpy.testing import assert_almost_equal, assert_equal
 
+import kinisi
 from kinisi import parser
-
 
 class mda_universe_generator:
     def __init__(self, coords, weights):
@@ -68,7 +69,6 @@ class Test_calculate_centers_of_mass(unittest.TestCase):
         mda_com_coords = mda_object.calculate_com()
 
         assert_almost_equal(mda_com_coords, kinisi_com)
-
 
 class TestSubsetApprox(unittest.TestCase):
     """
@@ -155,6 +155,46 @@ class test_is_orthorhombic(unittest.TestCase):
                              values=np.cumsum(test_disp, axis=0),
                              unit=sc.units.angstrom)
         assert_almost_equal(disp.values, test_disp.values)
+
+dg = sc.io.load_hdf5(os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_drift.h5'))
+coords = dg['coords']
+latt = dg['latt']
+time_step = dg['time_step']
+step_skip = dg['step_skip']
+dt = dg['dt']
+specie_indices = dg['specie_indices']
+drift_indices = dg['drift_indices']
+dimension = dg['dimension']
+disp = dg['disp']
+
+class TestParser(unittest.TestCase):
+    """
+    Unit tests for the Parser class
+    """
+
+    def test_parser_init_time_interval(self):
+        data = parser.Parser(coords, latt, time_step, step_skip, dt, specie_indices, drift_indices, dimension=dimension)
+        assert_equal(data.time_step, time_step)
+
+    def test_parser_init_stepskip(self):
+        data = parser.Parser(coords, latt, time_step, step_skip, dt, specie_indices, drift_indices, dimension=dimension)
+        assert_equal(data.step_skip, step_skip)
+    
+    def test_parser_init_drift_indices(self):
+        data = parser.Parser(coords, latt, time_step, step_skip, dt, specie_indices, drift_indices, dimension=dimension)
+        assert_equal(data.drift_indices.values,drift_indices.values)
+
+    def test_parser_dt(self):
+        data = parser.Parser(coords, latt, time_step, step_skip, dt, specie_indices, drift_indices, dimension=dimension)
+        assert_equal(data.dt.size, 140)
+
+    def test_parser_datagroup_round_trip(self):
+        data = parser.Parser(coords, latt, time_step, step_skip, dt, specie_indices, drift_indices, dimension=dimension)
+        datagroup = data._to_datagroup()
+        data_2 = parser.Parser._from_datagroup(datagroup)
+        assert vars(data) == vars(data_2)
+        assert type(data) is type(data_2)
+
 
 # import unittest
 # import numpy as np

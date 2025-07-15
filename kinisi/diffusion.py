@@ -4,7 +4,7 @@ Calculate the diffusion coefficient.
 
 # Copyright (c) kinisi developers.
 # Distributed under the terms of the MIT License.
-# author: Andrew R. McCluskey (arm61)
+# author: Andrew R. McCluskey (arm61) and Oskar G. Soulas (osoulas)
 
 import numpy as np
 import scipp as sc
@@ -36,6 +36,33 @@ class Diffusion:
         self._start_dt = None
         self._cond_max = None
         self._covariance_matrix = None
+
+    def _to_datagroup(self) -> sc.DataGroup:
+        """
+        Convert the :py:class:`Diffusion` object to a :py:mod: 'scipp' DataGroup.
+        :return: A :py:mod:`scipp` DataGroup representing the :py:class:`Diffusion` object.
+        """
+        group = self.__dict__.copy()
+        for key, value in group.items():
+            if value is None:
+                group[key] = sc.scalar(value=np.nan, dtype='float64')
+        return sc.DataGroup(group)
+    
+    @classmethod
+    def _from_datagroup(cls, datagroup) -> 'Diffusion':
+        """
+        Convert a :py:mod: 'scipp' DataGroup back to a :py:class:`Diffusion` object.
+        :return: A :py:class:`Diffusion` object.
+        """
+        obj = cls.__new__(cls)
+
+        for key, value in datagroup.items():
+            if type(value) == sc.Variable and value.ndim == 0 and np.isnan(value.value):
+                setattr(obj, key, None)
+            else:
+                setattr(obj, key, value)
+
+        return obj
 
     @property
     def covariance_matrix(self) -> sc.Variable:
@@ -139,7 +166,7 @@ class Diffusion:
         :param start_dt: The time at which the diffusion regime begins.
         :param kwargs: Additional keyword arguments to pass to :py:func:`bayesian_regression`.
         """
-        self.bayesian_regression(start_dt=start_dt, **kwargs)
+        self.bayesian_regression(start_dt=sc.to_unit(start_dt, self.da.coords['time interval'].unit), **kwargs)
         _diffusion_coefficient = sc.to_unit(self.gradient / (2 * self.da.coords['dimensionality'].value), 'cm2/s')
         self._diffusion_coefficient = Samples(_diffusion_coefficient.values, _diffusion_coefficient.unit)
 

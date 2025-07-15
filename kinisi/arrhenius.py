@@ -232,6 +232,20 @@ class TemperatureDependent:
             parameters = np.array([self.data_group[name].value for name in self.parameter_names])
             return sc.scalar(self.function(extrapolated_temperature, *parameters), unit=self.diffusion.unit)
 
+    @property
+    def distribution(self) -> np.ndarray:
+        """
+        :return: A distribution of samples for the Arrhenius relationship that can be used for easy
+        plotting of credible intervals.
+        """
+        if isinstance(self.data_group[self.parameter_names[0]], Samples):
+            parameters = np.array([self.data_group[name].values for name in self.parameter_names])
+            return self.function(self.temperature.values[:, np.newaxis], *parameters)
+        else:
+            raise ValueError(
+                'Distribution can only be calculated for Samples objects. Please run mcmc() first to obtain Samples.'
+            )
+
 
 def arrhenius(abscissa: VariableLike, activation_energy: VariableLike, prefactor: VariableLike) -> VariableLike:
     """

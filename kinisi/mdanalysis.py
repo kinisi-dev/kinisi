@@ -50,10 +50,17 @@ class MDAnalysisParser(Parser):
         dimension: str = 'xyz',
         distance_unit: sc.Unit = sc.units.angstrom,
         specie_indices: VariableLikeType = None,
+        drift_indices: VariableLikeType = None,
         masses: VariableLikeType = None,
         progress: bool = True,
     ):
         structure, coords, latt = self.get_structure_coords_latt(universe, distance_unit, progress)
+
+        if specie is None and specie_indices is None:
+                raise TypeError('Must specify specie or specie_indices as scipp VariableLikeType')
+        else:
+            if specie is not None:
+                specie_indices, drift_indices = self.get_indices(structure, specie)
 
         super().__init__(
             structure, coords, latt, specie, time_step, step_skip, dt, specie_indices, masses, dimension
@@ -74,7 +81,7 @@ class MDAnalysisParser(Parser):
         :param sub_sample_traj: Subsample the trajectory. Optional, defaults to 1.
 
         :returns: A tuple of:  the initial structure (as
-            a :py:class:`MDAnalysis.core.universe.Universe`), coordinates (as
+            a :py:class:`MDAnalysis.core.universe.Universe.atoms`), coordinates (as
             a :py:mod:`scipp` array with dimensions of `time`, `atom`, and `dimension`),
             and lattice parameters (as a :py:mod:`scipp` array with dimensions `time`,
             `dimension1`, and `dimension2`).
@@ -106,7 +113,7 @@ class MDAnalysisParser(Parser):
 
     def get_indices(
         self,
-        structure: 'MDAnalysis.universe.Universe',
+        structure: 'MDAnalysis.universe.Universe.atoms',
         specie: str,
     ) -> tuple[VariableLikeType, VariableLikeType]:
         """
@@ -131,7 +138,7 @@ class MDAnalysisParser(Parser):
                 drift_indices.append(i)
 
         if len(indices) == 0:
-            raise ValueError('There are no species selected to calculate the mean-squared displacement of.')
+            raise ValueError('There are no atoms selected to calculate the mean-squared displacement of.')
 
         indices = sc.Variable(dims=['atom'], values=indices)
         drift_indices = sc.Variable(dims=['atom'], values=drift_indices)

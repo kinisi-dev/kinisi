@@ -5,8 +5,9 @@ Parsers for kinisi. This module is responsible for reading in input files from :
 
 # Copyright (c) kinisi developers.
 # Distributed under the terms of the MIT License.
-# author: Andrew R. McCluskey (arm61) and Harry Richardson (Harry-Rich).
+# author: Andrew R. McCluskey (arm61), Harry Richardson (Harry-Rich) and Oskar G. Soulas (osoulas).
 
+import importlib
 from typing import Union
 
 import numpy as np
@@ -66,18 +67,13 @@ class Parser:
 
     def __init__(
         self,
-        structure: VariableLikeType,
         coords: VariableLikeType,
         latt: VariableLikeType,
-        specie: Union[
-            'pymatgen.core.periodic_table.Element',
-            'pymatgen.core.periodic_table.Specie',
-            'str',
-        ],
         time_step: VariableLikeType,
         step_skip: VariableLikeType,
         dt: VariableLikeType = None,
         specie_indices: VariableLikeType = None,
+        drift_indices: VariableLikeType = None,
         masses: VariableLikeType = None,
         dimension: str = 'xyz'
     ):
@@ -88,7 +84,13 @@ class Parser:
 
         self.dt_index = self.create_integer_dt(coords, time_step, step_skip)
 
-        coords, indices, drift_indices = self.generate_indices(structure, specie_indices, coords, specie, masses)
+        if not isinstance(specie_indices, sc.Variable):
+            raise TypeError('Unrecognized type for specie_indices, specie_indices must be a scipp VariableLikeType')
+        else:
+            if len(specie_indices.dims) == 1:
+                indices = specie_indices
+            else:
+                coords, indices, drift_indices = get_molecules(coords, specie_indices, masses)
 
         self.indices = indices
         self.drift_indices = drift_indices
@@ -107,6 +109,39 @@ class Parser:
 
         self.displacements = drift_corrected['atom', indices]
         self._volume = np.prod(latt.values[0].diagonal()) * latt.unit**3
+
+    def _to_datagroup(self, hdf5=True) -> sc.DataGroup:
+        """
+        Convert the :py:class:`Parser` object to a :py:mod: 'scipp' DataGroup.
+        :param hdf5: If `True`, incompatible classes will be converted for saving to HDF5.
+        :return: A :py:mod:`scipp` DataGroup representing the :py:class:`Parser` object.
+        """
+        group = self.__dict__.copy()
+        if hdf5:
+            group.pop('_slice')
+        group['__class__'] = f'{self.__class__.__module__}.{self.__class__.__name__}'
+        return sc.DataGroup(group)
+
+    @classmethod
+    def _from_datagroup(cls, datagroup) -> 'Parser':
+        """
+        Convert a :py:mod: 'scipp' DataGroup back to a :py:class:`Parser` object.
+        :return: A :py:class:`Parser` object.
+        """
+        class_path = str(datagroup['__class__'])
+        module_name, class_name = class_path.rsplit('.', 1)
+        module = importlib.import_module(module_name)
+        klass = getattr(module, class_name)
+
+        obj = klass.__new__(klass)
+
+        for key, value in datagroup.items():
+            if key != '__class__':
+                setattr(obj, key, value)
+        if not hasattr(obj, '_slice'):
+            obj._slice = DIMENSIONALITY[obj._dimension.lower()]
+
+        return obj
 
     def create_integer_dt(
         self,
@@ -289,20 +324,14 @@ class Parser:
 
 
 def get_molecules(
-    structure: Union[
-        'ase.atoms.Atoms',
-        'pymatgen.core.structure.Structure',
-        'MDAnalysis.universe.Universe',
-    ],
     coords: VariableLikeType,
     indices: VariableLikeType,
     masses: VariableLikeType,
 ) -> tuple[np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray]]:
     """
     Determine framework and non-framework indices for an :py:mod:`ase` or :py:mod:`pymatgen` or :py:mod:`MDAnalysis` compatible file when
-    specie_indices are provided and contain multiple molecules. Warning: This function changes the structure without changing the object.
+    specie_indices are provided and contain multiple molecules. Warning: This function changes the coords without renaming the object.
 
-    :param structure: Initial structure.
     :param coords: fractional coordinates for all atoms.
     :param indices: indices for the atoms in the molecules in the trajectory used in the calculation
     of the diffusion.
@@ -320,7 +349,7 @@ def get_molecules(
 
     n_molecules = indices.sizes['group_of_atoms']
 
-    for i, _site in enumerate(structure):
+    for i in range(coords.sizes['atom']):
         if i not in indices.values:
             drift_indices.append(i)
 
@@ -348,38 +377,6 @@ def get_molecules(
     )
 
     return new_coords, new_indices, new_drift_indices
-
-
-def get_framework(
-    structure: Union[
-        'ase.atoms.Atoms',
-        'pymatgen.core.structure.Structure',
-        'MDAnalysis.universe.Universe',
-    ],
-    indices: VariableLikeType,
-) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Determine the framework indices from an :py:mod:`ase` or :py:mod:`pymatgen` or :py:mod:`MDAnalysis` compatible file when indices are provided
-
-    :param structure: Initial structure.
-    :param indices: Indices for the atoms in the trajectory used in the calculation of the
-        diffusion.
-    :param framework_indices: Indices of framework to be used in drift correction. If set to None will return all indices that are not in indices.
-
-    :return: Tuple containing: indices for the atoms in the trajectory used in the calculation of the
-        diffusion and indices of framework atoms.
-    """
-
-    drift_indices = []
-
-    for i, _site in enumerate(structure):
-        if i not in indices:
-            drift_indices.append(i)
-
-    drift_indices = sc.Variable(dims=['atom'], values=drift_indices)
-
-    return indices, drift_indices
-
 
 def _calculate_centers_of_mass(
     coords: VariableLikeType,
