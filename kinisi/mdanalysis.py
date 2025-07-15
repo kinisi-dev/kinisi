@@ -50,6 +50,7 @@ class MDAnalysisParser(Parser):
         dimension: str = 'xyz',
         distance_unit: sc.Unit = sc.units.angstrom,
         specie_indices: VariableLikeType = None,
+        drift_indices: VariableLikeType = None,
         masses: VariableLikeType = None,
         progress: bool = True,
     ):

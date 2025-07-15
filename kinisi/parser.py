@@ -91,6 +91,8 @@ class Parser:
                 indices = specie_indices
             else:
                 coords, indices, drift_indices = get_molecules(coords, specie_indices, masses)
+        if drift_indices is None:
+            drift_indices = sc.array(dims=['atom'],values=[x for x in range(coords.sizes['atom']) if x not in specie_indices])
 
         self.indices = indices
         self.drift_indices = drift_indices
