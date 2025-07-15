@@ -1,266 +1,186 @@
 """
-The :py:class:`kinisi.analyze.ConductivityAnalyzer` class will allow the conductivity of a material in a
-simulation to be found, without assuming a Haven ration of 1.
+The :py:class:kinisi.analyze.ConductivityAnalyzer` class for MSCD
+and conductivity analysis.
 """
 
-# Copyright (c) Andrew R. McCluskey and Benjamin J. Morgan
+# Copyright (c) kinisi developers.
 # Distributed under the terms of the MIT License
 # author: Andrew R. McCluskey (arm61)
 
-from typing import Union, List
+from typing import Union
+
 import numpy as np
-from kinisi import diffusion
-from .analyzer import Analyzer
+import scipp as sc
+from scipp.typing import VariableLikeType
+
+from kinisi.analyzer import Analyzer
+from kinisi.diffusion import Diffusion
+from kinisi.displacement import calculate_mstd
+from kinisi.parser import Parser
 
 
 class ConductivityAnalyzer(Analyzer):
     """
-    The :py:class:`kinisi.analyze.ConductivityAnalyzer` class performs analysis of conductive relationships in
-    materials.
-    This is achieved through the application of a bootstrapping methodology to obtain the most statistically
-    accurate values for mean squared charge displacement uncertainty and covariance.
-    The time-dependence of the MSCD is then modelled in a generalised least squares fashion to obtain the jump
-    diffusion coefficient and offset using Markov chain Monte Carlo maximum likelihood sampling.
+    The :py:class:`kinisi.analyze.ConductivityAnalyzer` class performs analysis of conductivity in materials.
+    This is achieved through the application of a Bayesian regression methodology to obtain optimal estimates
+    of the mean-squared charge displacement and covariance.
+    This is then sampled with a linear model to estimate the conductivity, via the jump diffusion coefficient.
 
-    :param delta_t: An array of the time interval values.
-    :param disp_3d: A list of arrays, where each array has the axes [atom, displacement observation, dimension].
-        There is one array in the list for each delta_t value. Note: it is necessary to use a list of arrays as
-        the number of observations is not necessary the same at each data point.
-    :param volume: The volume of the simulation cell.
-    :param uncertainty_params: The parameters for the :py:class:`kinisi.diffusion.DiffBootstrap` object. See
-        the appropriate documentation for more guidance on this. Optional, default is the default bootstrap parameters.
-    :param ionic_charge: The charge on the mobile ions, either an array with a value for each ion or a scalar
-        if all values are the same. Optional, default is :py:attr:`1`.
+    :param trajectory: The parsed trajectory from some input file. This will be of type :py:class:`Parser`, but
+        the specifics depend on the parser that is used.
     """
 
-    def __init__(self, delta_t: np.ndarray, disp_3d: List[np.ndarray], n_o: np.ndarray, volume: float):
-        super().__init__(delta_t, disp_3d, n_o, volume)
-        self._diff = None
-
-    def to_dict(self) -> dict:
-        """
-        :return: Dictionary description of :py:class:`ConductivityAnalyzer`.
-        """
-        my_dict = super().to_dict()
-        my_dict['diff'] = self._diff.to_dict()
-        return my_dict
+    def __init__(self, trajectory: Parser) -> None:
+        super().__init__(trajectory)
+        self._da = None
 
     @classmethod
-    def from_dict(cls, my_dict: dict) -> 'ConductivityAnalyzer':
+    def from_xdatcar(
+        cls,
+        trajectory: Union['pymatgen.io.vasp.outputs.Xdatcar', list['pymatgen.io.vasp.outputs.Xdatcar']],
+        specie: Union['pymatgen.core.periodic_table.Element', 'pymatgen.core.periodic_table.Specie'],
+        time_step: VariableLikeType,
+        step_skip: VariableLikeType,
+        ionic_charge: VariableLikeType,
+        dtype: str | None = None,
+        dt: VariableLikeType = None,
+        dimension: str = 'xyz',
+        distance_unit: sc.Unit = sc.units.angstrom,
+        species_indices: VariableLikeType = None,
+        masses: VariableLikeType = None,
+        system_particles: int = 1,
+        progress: bool = True,
+    ) -> 'ConductivityAnalyzer':
         """
-        Generate a :py:class:`ConductivityAnalyzer` object from a dictionary.
-
-        :param my_dict: The input dictionary.
-
-        :return: New :py:class`ConductivityAnalyzer` object.
-        """
-        cond_anal = cls(my_dict['delta_t'], my_dict['disp_3d'], my_dict['n_o'], my_dict['volume'])
-        cond_anal._diff = diffusion.Bootstrap.from_dict(my_dict['diff'])
-        return cond_anal
-
-    @classmethod
-    def from_pymatgen(cls,
-                      trajectory: List[Union['pymatgen.core.structure.Structure',
-                                             List['pymatgen.core.structure.Structure']]],
-                      parser_params: dict,
-                      dtype: str = None,
-                      uncertainty_params: dict = None,
-                      ionic_charge: Union[np.ndarray, int] = 1):
-        """
-        Create a :py:class:`ConductivityAnalyzer` object from a list or nested list of
-        :py:class:`pymatgen.core.structure.Structure` objects.
-
-        :param trajectory: The list or nested list of structures to be analysed.
-        :param parser_params: The parameters for the :py:class:`kinisi.parser.PymatgenParser` object. See the
-            appropriate documentation for more guidance on this dictionary.
-        :param dtype: If :py:attr:`trajectory` is a list of :py:class:`pymatgen.core.structure.Structure` objects,
-            this should be :py:attr:`None`. However, if a list of lists is passed, then it is necessary to identify if
-            these constitute a series of :py:attr:`consecutive` trajectories or a series of :py:attr:`identical`
-            starting points with different random seeds, in which case the `dtype` should be either
-            :py:attr:`consecutive` or :py:attr:`identical`.
-        :param uncertainty_params: The parameters for the :py:class:`kinisi.diffusion.MSDBootstrap` object. See the
-            appropriate documentation for more guidance on this. Optional, default is the default bootstrap parameters.
-        :param ionic_charge: The charge on the mobile ions, either an array with a value for each ion or a scalar
-            if all values are the same. Optional, default is :py:attr:`1`.
-
-        :return: Relevant :py:class:`ConductivityAnalyzer` object.
-        """
-        if uncertainty_params is None:
-            uncertainty_params = {}
-        cond_anal = super()._from_pymatgen(trajectory, parser_params, dtype=dtype)
-        cond_anal._diff = diffusion.MSCDBootstrap(cond_anal._delta_t, cond_anal._disp_3d, ionic_charge, cond_anal._n_o,
-                                                  **uncertainty_params)
-        return cond_anal
-
-    @classmethod
-    def from_ase(cls,
-                 trajectory: List[Union['ase.atoms.Atoms', List['ase.atom.Atoms']]],
-                 parser_params: dict,
-                 dtype: str = None,
-                 uncertainty_params: dict = None,
-                 ionic_charge: Union[np.ndarray, int] = 1):
-        """
-        Create a :py:class:`ConductivityAnalyzer` object from a list or nested list of
-        :py:class:`ase.Atoms` objects.
-
-        :param trajectory: The list or nested list of structures to be analysed.
-        :param parser_params: The parameters for the :py:class:`kinisi.parser.ASEParser` object. See the
-            appropriate documentation for more guidance on this dictionary.
-        :param dtype: If :py:attr:`trajectory` is a list of :py:class:`ase.Atoms` objects,
-            this should be :py:attr:`None`. However, if a list of lists is passed, then it is necessary to identify if
-            these constitute a series of :py:attr:`consecutive` trajectories or a series of :py:attr:`identical`
-            starting points with different random seeds, in which case the `dtype` should be either
-            :py:attr:`consecutive` or :py:attr:`identical`.
-        :param uncertainty_params: The parameters for the :py:class:`kinisi.diffusion.MSDBootstrap` object. See the
-            appropriate documentation for more guidance on this. Optional, default is the default bootstrap parameters.
-        :param ionic_charge: The charge on the mobile ions, either an array with a value for each ion or a scalar
-            if all values are the same. Optional, default is :py:attr:`1`.
-
-        :return: Relevant :py:class:`ConductivityAnalyzer` object.
-        """
-        if uncertainty_params is None:
-            uncertainty_params = {}
-        cond_anal = super()._from_ase(trajectory, parser_params, dtype=dtype)
-        cond_anal._diff = diffusion.MSCDBootstrap(cond_anal._delta_t, cond_anal._disp_3d, ionic_charge, cond_anal._n_o,
-                                                  **uncertainty_params)
-        return cond_anal
-
-    @classmethod
-    def from_Xdatcar(cls,
-                     trajectory: Union['pymatgen.io.vasp.outputs.Xdatcar', List['pymatgen.io.vasp.outputs.Xdatcar']],
-                     parser_params: dict,
-                     dtype: str = None,
-                     uncertainty_params: dict = None,
-                     ionic_charge: Union[np.ndarray, int] = 1):
-        """
-        Create a :py:class:`ConductivityAnalyzer` object from a single or a list of
+        Constructs the necessary :py:mod:`kinisi` objects for analysis from a single or a list of
         :py:class:`pymatgen.io.vasp.outputs.Xdatcar` objects.
 
-        :param trajectory: The Xdatcar or list of Xdatcar objects to be analysed.
-        :param parser_params: The parameters for the :py:class:`kinisi.parser.PymatgenParser` object. See the
-            appropriate documentation for more guidance on this dictionary.
+        :param trajectory: The :py:class:`pymatgen.io.vasp.outputs.Xdatcar` or list of these that should be parsed.
+        :param specie: Specie to calculate diffusivity for as a String, e.g. :py:attr:`'Li'`.
+        :param time_step: The input simulation time step, i.e., the time step for the molecular dynamics integrator. Note,
+            that this must be given as a :py:mod:`scipp`-type scalar. The unit used for the time_step, will be the unit
+            that is use for the time interval values.
+        :param step_skip: Sampling freqency of the simulation trajectory, i.e., how many time steps exist between the
+            output of the positions in the trajectory. Similar to the :py:attr:`time_step`, this parameter must be
+            a :py:mod:`scipp` scalar. The units for this scalar should be dimensionless.
+        :param ionic_charge: The ionic charge of the species of interest. This should be either a :py:mod:`scipp`
+            scalar if all of the ions have the same charge or an array of the charge for each indiviudal ion.
         :param dtype: If :py:attr:`trajectory` is a :py:class:`pymatgen.io.vasp.outputs.Xdatcar` object, this should
             be :py:attr:`None`. However, if a list of :py:class:`pymatgen.io.vasp.outputs.Xdatcar` objects is passed,
-            then it is necessary to identify if these constitute a series of :py:attr:`consecutive` trajectories or a
-            series of :py:attr:`identical` starting points with different random seeds, in which case the `dtype`
-            should be either :py:attr:`consecutive` or :py:attr:`identical`.
-        :param uncertainty_params: The parameters for the :py:class:`kinisi.diffusion.MSDBootstrap` object. See the
-            appropriate documentation for more guidance on this. Optional, default is the default bootstrap parameters.
-        :param ionic_charge: The charge on the mobile ions, either an array with a value for each ion or a scalar
-            if all values are the same. Optional, default is :py:attr:`1`.
+            then it is necessary to identify if these constitute a series of :py:attr:`consecutive` trajectories or
+            a series of :py:attr:`identical` starting points with different random seeds, in which case the `dtype`
+            should be either :py:attr:`consecutive` or :py:attr:`identical`.:
+        :param dt: Time intervals to calculate the displacements over. Optional, defaults to a :py:mod:`scipp` array
+            ranging from the smallest interval (i.e., time_step * step_skip) to the full simulation length, with
+            a step size the same as the smallest interval.
+        :param dimension: Dimension/s to find the displacement along, this should be some subset of `'xyz'` indicating
+            the axes of interest. Optional, defaults to `'xyz'`.
+        :param distance_unit: The unit of distance in the simulation input. This should be a :py:mod:`scipp` unit and
+            defaults to :py:attr:`sc.units.angstrom`.
+        :param specie_indices: The indices of the species to compute the centre of mass of. Optional, defaults to
+            :py:attr:`None`, which means that all species are considered.
+        :param masses: The masses of the species to calculate the diffusion for. Optional, defaults
+            to :py:attr:`None`, which means that the masses are not considered.
+        :param system_particles: The number of system particles to average over. Note that the constitution of the
+            system particles are defined in index order, i.e., two system particles will involve splitting the
+            particles down the middle into each. Optional, defaults to :py:attr:`1`.
+        :param progress: Print progress bars to screen. Optional, defaults to :py:attr:`True`.
 
-        :return: Relevant :py:class:`ConductivityAnalyzer` object.
+        :returns: The :py:class:`ConductivityAnalyzer` object with the mean-squared charge displacement calculated.
         """
-        if uncertainty_params is None:
-            uncertainty_params = {}
-        cond_anal = super()._from_Xdatcar(trajectory, parser_params, dtype=dtype)
-        cond_anal._diff = diffusion.MSCDBootstrap(cond_anal._delta_t, cond_anal._disp_3d, ionic_charge, cond_anal._n_o,
-                                                  **uncertainty_params)
-        return cond_anal
+        p = super()._from_xdatcar(
+            trajectory,
+            specie,
+            time_step,
+            step_skip,
+            dtype,
+            dt,
+            dimension,
+            distance_unit,
+            species_indices,
+            masses,
+            progress,
+        )
+        p._da = calculate_mstd(p.trajectory, system_particles, ionic_charge, progress)
+        return p
 
-    @classmethod
-    def from_file(cls,
-                  trajectory: Union[str, List[str]],
-                  parser_params: dict,
-                  dtype: str = None,
-                  uncertainty_params: dict = None,
-                  ionic_charge: Union[np.ndarray, int] = 1):
+    def conductivity(
+        self,
+        start_dt: VariableLikeType,
+        temperature: VariableLikeType,
+        cond_max: float = 1e16,
+        fit_intercept: bool = True,
+        n_samples: int = 1000,
+        n_walkers: int = 32,
+        n_burn: int = 500,
+        n_thin: int = 10,
+        progress: bool = True,
+        random_state: np.random.mtrand.RandomState = None,
+    ) -> None:
         """
-        Create a :py:class:`ConductivityAnalyzer` object from a single or a list of Xdatcar file(s).
+        Calculation of the conductivity.
+        Keyword arguments will be passed of the :py:func:`bayesian_regression` method.
 
-        :param trajectory: The file or list of Xdatcar files to be analysed.
-        :param parser_params: The parameters for the :py:class:`kinisi.parser.PymatgenParser` object. See the
-            appropriate documentation for more guidance on this dictionary.
-        :param dtype: If :py:attr:`trajectory` is a single file, this should be :py:attr:`None`. However, if a
-            list of files is passed, then it is necessary to identify if these constitute a series of
-            :py:attr:`consecutive` trajectories or a series of :py:attr:`identical` starting points with different
-            random seeds, in which case the `dtype` should be either :py:attr:`consecutive` or :py:attr:`identical`.
-        :param uncertainty_params: The parameters for the :py:class:`kinisi.diffusion.MSDBootstrap` object. See the
-            appropriate documentation for more guidance on this. Optional, default is the default bootstrap parameters.
-        :param ionic_charge: The charge on the mobile ions, either an array with a value for each ion or a scalar
-            if all values are the same. Optional, default is :py:attr:`1`.
-
-        :return: Relevant :py:class:`ConductivityAnalyzer` object.
+        :param start_dt: The time at which the diffusion regime begins.
+        :param temperature: The temperature of the system.
+        :param cond_max: The maximum condition number of the covariance matrix. Optional, default is :py:attr:`1e16`.
+        :param fit_intercept: Whether to fit an intercept. Optional, default is :py:attr:`True`.
+        :param n_samples: The number of MCMC samples to take. Optional, default is :py:attr:`1000`.
+        :param n_walkers: The number of walkers to use in the MCMC. Optional, default is :py:attr:`32`.
+        :param n_burn: The number of burn-in samples to discard. Optional, default is :py:attr:`500`.
+        :param n_thin: The thinning factor for the MCMC samples. Optional, default is :py:attr:`10`.
+        :param progress: Whether to show the progress bar. Optional, default is :py:attr:`True`.
+        :param random_state: The random state to use for the MCMC. Optional, default is :py:attr:`None`.
         """
-        if uncertainty_params is None:
-            uncertainty_params = {}
-        cond_anal = super()._from_file(trajectory, parser_params, dtype=dtype)
-        cond_anal._diff = diffusion.MSCDBootstrap(cond_anal._delta_t, cond_anal._disp_3d, ionic_charge, cond_anal._n_o,
-                                                  **uncertainty_params)
-        return cond_anal
-
-    @classmethod
-    def from_universe(cls,
-                      trajectory: 'MDAnalysis.core.universe.Universe',
-                      parser_params: dict,
-                      dtype: str = None,
-                      uncertainty_params: dict = None,
-                      ionic_charge: Union[np.ndarray, int] = 1):
-        """
-        Create an :py:class:`ConductivityAnalyzer` object from an :py:class:`MDAnalysis.core.universe.Universe` object.
-
-        :param trajectory: The universe to be analysed.
-        :param parser_params: The parameters for the :py:class:`kinisi.parser.MDAnalysisParser` object.
-            See the appropriate documention for more guidance on this dictionary.
-        :param dtype: If :py:attr:`trajectory` is a single file, this should be :py:attr:`None`. However, if a
-            list of files is passed, then it is necessary to identify that these constitute a series of
-            :py:attr:`identical` starting points with different random seeds, in which case the `dtype` should
-            be :py:attr:`identical`. For a series of consecutive trajectories, please construct the relevant
-            object using :py:mod:`MDAnalysis`.
-        :param uncertainty_params: The parameters for the :py:class:`kinisi.diffusion.MSDBootstrap` object. See the
-            appropriate documentation for more guidance on this. Optional, default is the default bootstrap parameters.
-        :param ionic_charge: The charge on the mobile ions, either an array with a value for each ion or a scalar
-            if all values are the same. Optional, default is :py:attr:`1`.
-
-        :return: Relevant :py:class:`ConductivityAnalyzer` object.
-        """
-        if uncertainty_params is None:
-            uncertainty_params = {}
-        cond_anal = super()._from_universe(trajectory, parser_params, dtype=dtype)
-        cond_anal._diff = diffusion.MSCDBootstrap(cond_anal._delta_t, cond_anal._disp_3d, ionic_charge, cond_anal._n_o,
-                                                  **uncertainty_params)
-        return cond_anal
-
-    def conductivity(self, start_dt: float, temperature: float, conductivity_params: Union[dict, None] = None):
-        """
-        Calculate the jump diffusion coefficicent using the bootstrap-GLS methodology.
-
-        :param start_dt: The starting time for the analysis to find the diffusion coefficient.
-            This should be the start of the diffusive regime in the simulation.
-        :param temperature: Simulation temperature in Kelvin
-        :param conductivity_params: The parameters for the :py:class:`kinisi.diffusion.MSCDBootstrap` object.
-            See the appropriate documentation for more guidance on this. Optional, default is the default
-            bootstrap parameters
-        """
-        if conductivity_params is None:
-            conductivity_params = {}
-        self._diff.conductivity(start_dt, temperature, self._volume, **conductivity_params)
+        self.diff = Diffusion(da=self._da)
+        self.diff._conductivity(
+            start_dt,
+            temperature,
+            self.trajectory._volume,
+            cond_max=cond_max,
+            fit_intercept=fit_intercept,
+            n_samples=n_samples,
+            n_walkers=n_walkers,
+            n_burn=n_burn,
+            n_thin=n_thin,
+            progress=progress,
+            random_state=random_state,
+        )
 
     @property
-    def mscd(self) -> np.ndarray:
+    def distributions(self) -> np.array:
         """
-        :return: MSCD for the input trajectories. Note that this is the bootstrap sampled value, not the numerical
-            average from the data.
+        :return: A distribution of samples for the linear relationship that can be used for easy
+        plotting of credible intervals.
         """
-        return self._diff.n
+        if self.diff.intercept is not None:
+            return (
+                self.diff.gradient.values * self._da.coords['time interval'].values[:, np.newaxis]
+                + self.diff.intercept.values
+            )
+        else:
+            return self.diff.gradient.values * self._da.coords['time interval'].values[:, np.newaxis]
 
     @property
-    def mscd_std(self) -> np.ndarray:
+    def sigma(self) -> VariableLikeType:
         """
-        :return: MSCD standard deviation values for the input trajectories (a single standard deviation).
+        :return: The conductivity.
         """
-        return self._diff.s
+        return self.diff.sigma
 
     @property
-    def sigma(self) -> 'uravu.distribution.Distribution':
+    def mscd(self) -> VariableLikeType:
         """
-        :returns: Conductivity, in mS^{1}cm^{-1}.
+        :return: The mean-squared charge displacement.
         """
-        return self._diff.sigma
+        return self._da._data
 
     @property
-    def flatchain(self) -> np.ndarray:
+    def flatchain(self) -> sc.DataGroup:
         """
-        :return: sampling flatchain
+        :returns: The flatchain of the MCMC samples.
         """
-        return np.array([self.sigma.samples, self.intercept.samples]).T
+        flatchain = {'sigma': self.sigma}
+        if self.intercept is not None:
+            flatchain['intercept'] = self.intercept
+        return sc.DataGroup(**flatchain)

@@ -1,351 +1,299 @@
 """
-This module contains the base class for the different :py:class:`Analyzer` objects used by :py:mod:`kinisi`.
+The Analyzer class is the main API interface for users to :py:mod:`kinisi`.
+Typically, it is expected that the user would access a specific :py:class:`Analyzer`,
+such as the :py:class:`DiffusionAnalyzer`, which sub-class this class.
+
+Note, that all of the :py:attr:`classmethod` functions for the :py:class:`Analyzer`
+are intended for internal use.
 """
 
-# Copyright (c) Andrew R. McCluskey and Benjamin J. Morgan
-# Distributed under the terms of the MIT License
-# author: Andrew R. McCluskey (arm61)
+# Copyright (c) kinisi developers.
+# Distributed under the terms of the MIT License.
+# author: Andrew R. McCluskey (arm61), Harry Richardson (Harry-Rich) and Oskar G. Soulas (osoulas).
 
-from typing import Union, List
+from typing import Union
+import importlib
+
 import numpy as np
-from kinisi.parser import MDAnalysisParser, PymatgenParser, ASEParser
+import scipp as sc
+
+from kinisi.ase import ASEParser
+from kinisi.mdanalysis import MDAnalysisParser
+from kinisi.parser import Parser
+from kinisi.pymatgen import PymatgenParser
+from kinisi.diffusion import Diffusion
 
 
 class Analyzer:
     """
     This class is the superclass for the :py:class:`kinisi.analyze.DiffusionAnalyzer`,
     :py:class:`kinisi.analyze.JumpDiffusionAnalyzer` and :py:class:`kinisi.analyze.ConductivityAnalyzer` classes.
-    Therefore all of the properties here are available to these other classes.
 
-    :param delta_t: An array of the time interval values.
-    :param disp_3d: A list of arrays, where each array has the axes :code:`[atom, displacement observation,
-        dimension]`. There is one array in the list for each delta_t value. Note: it is necessary to use a
-        list of arrays as the number of observations is not necessary the same at each data point.
-    :param volume: The volume of the simulation cell.
+    :param trajectory: The parsed trajectory from some input file. This will be of type :py:class:`Parser`, but
+        the specifics depend on the parser that is used.
     """
 
-    def __init__(self, delta_t: np.ndarray, disp_3d: List[np.ndarray], n_o: np.ndarray, volume: float):
-        self._delta_t = delta_t
-        self._disp_3d = disp_3d
-        self._n_o = n_o
-        self._volume = volume
+    def __init__(self, trajectory: Parser) -> None:
+        self.trajectory = trajectory
 
-    def save(self, filename: str):
+    def _to_hdf5(self, filename: str) -> None:
         """
-        Save the Analyzer object as a HDF5 file.
+        Save the :py:class:`Analyzer` object to an HDF5 file.
 
-        :param filename: Name for the file, no file extension is required and if one if given it is replaced with .hdf.
+        :param filename: The name of the file to save the object to.
         """
-        filename = filename.rsplit('.', 1)[0] + '.hdf'
-        my_dict = self.to_dict()
-        try:
-            import h5py
-            from os.path import exists
-        except ModuleNotFoundError:  # pragma: no cover
-            raise ModuleNotFoundError("To save and load objects, the h5py module is required")  # pragma: no cover
-        if exists(filename):
-            raise ValueError(f"The file {filename} already exists, please delete it or change the input filename.")
-        with h5py.File(filename, 'w') as h5file:
-            _dict_to_group(h5file, '/', my_dict)
-
+        group = self.__dict__.copy()
+        
+        for key, value in group.items():
+            if key == 'trajectory':
+                group[key] = self.trajectory._to_datagroup(hdf5=True)
+            elif key == 'diff':
+                group[key] = self.diff._to_datagroup()
+            elif value is None:
+                group[key] = sc.scalar(value=np.nan, dtype='float64')
+        group['__class__'] = f"{self.__class__.__module__}.{self.__class__.__name__}"
+        sc.DataGroup(group).save_hdf5(filename)
+    
     @classmethod
-    def load(cls, filename: str) -> 'Analyzer':
+    def _from_hdf5(cls, filename: str) -> 'Analyzer':
         """
         Load the :py:class:`Analyzer` object from an HDF5 file.
 
-        :param filename: Name for the file, any file extension will be replaced with .hdf.
+        :param filename: The name of the file to load the object from.
+        """
+        datagroup = sc.io.load_hdf5(filename)
 
-        :return: An :py:class:`Analyzer` object from the file.
-        """
-        filename = filename.rsplit('.', 1)[0] + '.hdf'
-        try:
-            import h5py
-        except ModuleNotFoundError:  # pragma: no cover
-            raise ModuleNotFoundError("To save and load objects, the h5py module is required")  # pragma: no cover
-        with h5py.File(filename, 'r') as h5file:
-            my_dict = _group_to_dict(h5file, '/')
-        return cls.from_dict(my_dict)
+        class_path = str(datagroup['__class__'])
+        module_name, class_name = class_path.rsplit('.', 1)
+        module = importlib.import_module(module_name)
+        klass = getattr(module, class_name)
+        
+        obj = klass.__new__(klass)
 
-    def to_dict(self) -> dict:
-        """
-        :return: Dictionary description of Analyzer.
-        """
-        return {'delta_t': self._delta_t, 'disp_3d': self._disp_3d, 'n_o': self._n_o, 'volume': self._volume}
+        for key, value in datagroup.items():
+            if key == 'trajectory':
+                setattr(obj, key, Parser._from_datagroup(value))
+            elif key == 'diff':
+                setattr(obj, key, Diffusion._from_datagroup(value))
+            elif key != '__class__':
+                if type(value) == sc.Variable and value.ndim == 0 and np.isnan(value.value):
+                    setattr(obj, key, None)
+                else:
+                    setattr(obj, key, value)
+
+        return obj
 
     @classmethod
-    def from_dict(cls, my_dict: dict) -> 'Analyzer':
+    def _from_xdatcar(
+        cls,
+        trajectory: Union['pymatgen.io.vasp.outputs.Xdatcar', list['pymatgen.io.vasp.outputs.Xdatcar']],
+        specie: Union['pymatgen.core.periodic_table.Element', 'pymatgen.core.periodic_table.Specie'],
+        time_step: sc.Variable,
+        step_skip: sc.Variable,
+        dtype: str | None = None,
+        dt: sc.Variable = None,
+        dimension: str = 'xyz',
+        distance_unit: sc.Unit = sc.units.angstrom,
+        specie_indices: sc.Variable = None,
+        masses: sc.Variable = None,
+        progress: bool = True,
+    ) -> 'Analyzer':
         """
-        Generate an :py:class:`Analyzer` object from a dictionary.
-
-        :param my_dict: The input dictionary.
-
-        :return: New :py:class:`Analyzer` object.
-        """
-        return cls(**my_dict)
-
-    @classmethod
-    def _from_pymatgen(cls,
-                       trajectory: List[Union['pymatgen.core.structure.Structure',
-                                              List['pymatgen.core.structure.Structure']]],
-                       parser_params: dict,
-                       dtype: str = None,
-                       **kwargs):
-        """
-        Create a :py:class:`Analyzer` object from a list or nested list of
-        :py:class:`pymatgen.core.structure.Structure` objects.
-
-        :param trajectory: The list or nested list of structures to be analysed.
-        :param parser_params: The parameters for the :py:class:`kinisi.parser.PymatgenParser` object.
-            See the appropriate documentation for more guidance on this dictionary.
-        :param dtype: If :py:attr:`trajectory` is a list of :py:class:`pymatgen.core.structure.Structure`
-            objects, this should be :py:attr:`None`. However, if a list of lists is passed, then it is necessary
-            to identify if these constitute a series of :py:attr:`consecutive` trajectories or a series of
-            :py:attr:`identical` starting points with different random seeds, in which case the `dtype` should
-            be either :py:attr:`consecutive` or :py:attr:`identical`.
-
-        :return: Relevant :py:class:`Analyzer` object.
-        """
-        if dtype is None:
-            u = PymatgenParser(trajectory, **parser_params)
-            return cls(u.delta_t, u.disp_3d, u._n_o, u.volume, **kwargs)
-        elif dtype == 'identical':
-            u = [PymatgenParser(f, **parser_params) for f in trajectory]
-            n_o = np.zeros(u[0]._n_o.size)
-            for i in u:
-                n_o += i._n_o
-            return cls(u[0].delta_t, cls._stack_trajectories(u), n_o, u[0].volume, **kwargs)
-        elif dtype == 'consecutive':
-            structures = _flatten_list([x for x in trajectory])
-            u = PymatgenParser(structures, **parser_params)
-            return cls(u.delta_t, u.disp_3d, u._n_o, u.volume, **kwargs)
-        else:
-            raise ValueError('The dtype specified was not recognised, please consult the kinisi documentation.')
-
-    @classmethod
-    def _from_ase(cls,
-                  trajectory: List[Union['ase.atoms.Atoms', List['ase.atoms.Atoms']]],
-                  parser_params: dict,
-                  dtype: str = None,
-                  **kwargs):
-        """
-        Create a :py:class:`Analyzer` object from a list or nested list of
-        :py:class:`ase.atoms.Atoms` objects.
-
-        :param trajectory: The list or nested list of structures to be analysed.
-        :param parser_params: The parameters for the :py:class:`kinisi.parser.ASEParser` object.
-            See the appropriate documentation for more guidance on this dictionary.
-        :param dtype: If :py:attr:`trajectory` is a list of :py:class:`ase.atoms.Atoms`
-            objects, this should be :py:attr:`None`. However, if a list of lists is passed, then it is necessary
-            to identify if these constitute a series of :py:attr:`consecutive` trajectories or a series of
-            :py:attr:`identical` starting points with different random seeds, in which case the `dtype` should
-            be either :py:attr:`consecutive` or :py:attr:`identical`.
-
-        :return: Relevant :py:class:`Analyzer` object.
-        """
-        if dtype is None:
-            u = ASEParser(trajectory, **parser_params)
-            return cls(u.delta_t, u.disp_3d, u._n_o, u.volume, **kwargs)
-        elif dtype == 'identical':
-            u = [ASEParser(f, **parser_params) for f in trajectory]
-            n_o = np.zeros(u[0]._n_o.size)
-            for i in u:
-                n_o += i._n_o
-            return cls(u[0].delta_t, cls._stack_trajectories(u), n_o, u[0].volume, **kwargs)
-        elif dtype == 'consecutive':
-            structures = _flatten_list([x for x in trajectory])
-            u = ASEParser(structures, **parser_params)
-            return cls(u.delta_t, u.disp_3d, u._n_o, u.volume, **kwargs)
-        else:
-            raise ValueError('The dtype specified was not recognised, please consult the kinisi documentation.')
-
-    @classmethod
-    def _from_Xdatcar(cls,
-                      trajectory: Union['pymatgen.io.vasp.outputs.Xdatcar', List['pymatgen.io.vasp.outputs.Xdatcar']],
-                      parser_params: dict,
-                      dtype: str = None,
-                      **kwargs):
-        """
-        Create a :py:class:`Analyzer` object from a single or a list of
+        Constructs the necessary :py:mod:`kinisi` objects for analysis from a single or a list of
         :py:class:`pymatgen.io.vasp.outputs.Xdatcar` objects.
 
-        :param trajectory: The Xdatcar or list of Xdatcar objects to be analysed.
-        :param parser_params: The parameters for the :py:class:`kinisi.parser.PymatgenParser` object. See the
-            appropriate documentation for more guidance on this dictionary.
-        :param dtype: If :py:attr:`trajectory` is a :py:class:`pymatgen.io.vasp.outputs.Xdatcar` object, this
-            should be :py:attr:`None`. However, if a list of :py:class:`pymatgen.io.vasp.outputs.Xdatcar` objects is
-            passed, then it is necessary to identify if these constitute a series of :py:attr:`consecutive`
-            trajectories or a series of :py:attr:`identical` starting points with different random seeds, in which
-            case the `dtype` should be either :py:attr:`consecutive` or :py:attr:`identical`.
-
-        :return: Relevant :py:class:`Analyzer` object.
+        :param trajectory: The :py:class:`pymatgen.io.vasp.outputs.Xdatcar` or list of these that should be parsed.
+        :param specie: Specie to calculate diffusivity for as a String, e.g. :py:attr:`'Li'`.
+        :param time_step: The input simulation time step, i.e., the time step for the molecular dynamics integrator. Note,
+            that this must be given as a :py:mod:`scipp`-type scalar. The unit used for the time_step, will be the unit
+            that is use for the time interval values.
+        :param step_skip: Sampling freqency of the simulation trajectory, i.e., how many time steps exist between the
+            output of the positions in the trajectory. Similar to the :py:attr:`time_step`, this parameter must be
+            a :py:mod:`scipp` scalar. The units for this scalar should be dimensionless.
+        :param dtype: If :py:attr:`trajectory` is a :py:class:`pymatgen.io.vasp.outputs.Xdatcar` object, this should
+            be :py:attr:`None`. However, if a list of :py:class:`pymatgen.io.vasp.outputs.Xdatcar` objects is passed,
+            then it is necessary to identify if these constitute a series of :py:attr:`consecutive` trajectories or
+            a series of :py:attr:`identical` starting points with different random seeds, in which case the `dtype`
+            should be either :py:attr:`consecutive` or :py:attr:`identical`.:
+        :param dt: Time intervals to calculate the displacements over. Optional, defaults to a :py:mod:`scipp` array
+            ranging from the smallest interval (i.e., time_step * step_skip) to the full simulation length, with
+            a step size the same as the smallest interval.
+        :param dimension: Dimension/s to find the displacement along, this should be some subset of `'xyz'` indicating
+            the axes of interest. Optional, defaults to `'xyz'`.
+        :param distance_unit: The unit of distance in the simulation input. This should be a :py:mod:`scipp` unit and
+            defaults to :py:attr:`sc.units.angstrom`.
+        :param progress: Print progress bars to screen. Optional, defaults to :py:attr:`True`.
         """
         if dtype is None:
-            structures = trajectory.structures
-            u = PymatgenParser(structures, **parser_params)
-            return cls(u.delta_t, u.disp_3d, u._n_o, u.volume, **kwargs)
+            p = PymatgenParser(
+                trajectory.structures,
+                specie,
+                time_step,
+                step_skip,
+                dt,
+                dimension,
+                distance_unit,
+                specie_indices,
+                masses,
+                progress,
+            )
+            return cls(p)
         elif dtype == 'identical':
-            u = [PymatgenParser(f.structures, **parser_params) for f in trajectory]
-            n_o = np.zeros(u[0]._n_o.size)
-            for i in u:
-                n_o += i._n_o
-            return cls(u[0].delta_t, cls._stack_trajectories(u), n_o, u[0].volume, **kwargs)
+            u = [
+                PymatgenParser(
+                    f.structures,
+                    specie,
+                    time_step,
+                    step_skip,
+                    dt,
+                    dimension,
+                    distance_unit,
+                    progress,
+                    specie_indices,
+                    masses,
+                )
+                for f in trajectory
+            ]
+            p = u[0]
+            p.displacements = sc.concat([i.displacements for i in u], 'atom')
+            return cls(p)
         elif dtype == 'consecutive':
             structures = _flatten_list([x.structures for x in trajectory])
-            u = PymatgenParser(structures, **parser_params)
-            return cls(u.delta_t, u.disp_3d, u._n_o, u.volume, **kwargs)
-        else:
-            raise ValueError('The dtype specified was not recognised, please consult the kinisi documentation.')
+            p = PymatgenParser(
+                structures, specie, time_step, step_skip, dt, dimension, distance_unit, specie_indices, masses, progress
+            )
+            return cls(p)
 
     @classmethod
-    def _from_file(cls, trajectory: Union[str, List[str]], parser_params: dict, dtype: str = None, **kwargs):
+    def _from_universe(
+        cls,
+        trajectory: 'MDAnalysis.core.universe.Universe',
+        specie: str,
+        time_step: sc.Variable,
+        step_skip: sc.Variable,
+        dtype: str | None = None,
+        dt: sc.Variable = None,
+        dimension: str = 'xyz',
+        distance_unit: sc.Unit = sc.units.angstrom,
+        specie_indices: sc.Variable = None,
+        masses: sc.Variable = None,
+        progress: bool = True,
+    ) -> 'Analyzer':
         """
-        Create a :py:class:`Analyzer` object from a single or a list of Xdatcar file(s).
-
-        :param trajectory: The file or list of Xdatcar files to be analysed.
-        :param parser_params: The parameters for the :py:class:`kinisi.parser.PymatgenParser` object. See the
-            appropriate documentation for more guidance on this dictionary.
-        :param dtype: If :py:attr:`trajectory` is a single file, this should be :py:attr:`None`. However, if a
-            list of files is passed, then it is necessary to identify if these constitute a series of
-            :py:attr:`consecutive` trajectories or a series of :py:attr:`identical` starting points with different
-            random seeds, in which case the `dtype` should be either :py:attr:`consecutive` or :py:attr:`identical`.
-
-        :return: Relevant :py:class:`Analyzer` object.
+        Constructs the necessary :py:mod:`kinisi` objects for analysis from a
+        :py:class:`MDAnalysis.core.universe.Universe` object.
         """
-        try:
-            from pymatgen.io.vasp import Xdatcar
-        except ModuleNotFoundError:  # pragma: no cover
-            raise ModuleNotFoundError("To use the from_file method, pymatgen must be installed.")  # pragma: no cover
         if dtype is None:
-            structures = Xdatcar(trajectory).structures
-            u = PymatgenParser(structures, **parser_params)
-            return cls(u.delta_t, u.disp_3d, u._n_o, u.volume, **kwargs)
+            p = MDAnalysisParser(
+                universe=trajectory,
+                specie=specie,
+                time_step=time_step,
+                step_skip=step_skip,
+                dt=dt,
+                dimension=dimension,
+                distance_unit=distance_unit,
+                specie_indices=specie_indices,
+                masses=masses,
+                progress=progress,
+            )
+            print(p)
+            return cls(p)
         elif dtype == 'identical':
-            u = [PymatgenParser(Xdatcar(f).structures, **parser_params) for f in trajectory]
-            n_o = np.zeros(u[0]._n_o.size)
-            for i in u:
-                n_o += i._n_o
-            return cls(u[0].delta_t, cls._stack_trajectories(u), n_o, u[0].volume, **kwargs)
-        elif dtype == 'consecutive':
-            trajectory_list = (Xdatcar(f) for f in trajectory)
-            structures = _flatten_list([x.structures for x in trajectory_list])
-            u = PymatgenParser(structures, **parser_params)
-            return cls(u.delta_t, u.disp_3d, u._n_o, u.volume, **kwargs)
-        else:
-            raise ValueError('The dtype specified was not recognised, please consult the kinisi documentation.')
+            u = [
+                MDAnalysisParser(
+                    universe=f,
+                    specie=specie,
+                    time_step=time_step,
+                    step_skip=step_skip,
+                    dt=dt,
+                    dimension=dimension,
+                    distance_unit=distance_unit,
+                    specie_indices=specie_indices,
+                    masses=masses,
+                    progress=progress,
+                )
+                for f in trajectory
+            ]
+            p = u[0]
+            p.displacements = sc.concat([i.displacements for i in u], 'atom')
+            return cls(p)
 
     @classmethod
-    def _from_universe(cls,
-                       trajectory: 'MDAnalysis.core.universe.Universe',
-                       parser_params: dict,
-                       dtype: str = None,
-                       **kwargs):
+    def _from_ase(
+        cls,
+        trajectory: Union['ase.io.trajectory.Trajectory', list['ase.io.trajectory.Trajectory']],
+        specie: Union[str, 'ase.Atom', None],
+        time_step: sc.Variable,
+        step_skip: sc.Variable,
+        dtype: str | None = None,
+        dt: sc.Variable = None,
+        dimension: str = 'xyz',
+        distance_unit: sc.Unit = sc.units.angstrom,
+        specie_indices: sc.Variable = None,
+        masses: sc.Variable = None,
+        progress: bool = True,
+    ) -> 'Analyzer':
         """
-        Create an :py:class:`Analyzer` object from an :py:class:`MDAnalysis.core.universe.Universe` object.
-
-        :param trajectory: The universe to be analysed.
-        :param parser_params: The parameters for the :py:class:`kinisi.parser.MDAnalysisParser` object.
-            See the appropriate documentation for more guidance on this dictionary.
-        :param dtype: If :py:attr:`trajectory` is a single file, this should be :py:attr:`None`. However, if a
-            list of files is passed, then it is necessary to identify that these constitute a series of
-            :py:attr:`identical` starting points with different random seeds, in which case the `dtype` should
-            be :py:attr:`identical`. For a series of consecutive trajectories, please construct the relevant
-            object using :py:mod:`MDAnalysis`.
-
-        :return: Relevant :py:class:`Analyzer` object.
+        Constructs the necessary :py:mod:`kinisi` objects for analysis from a single or a list of
+        :py:class:`ase.io.trajectory.Trajectory` objects.
         """
-        try:
-            import MDAnalysis as mda
-        except ModuleNotFoundError:  # pragma: no cover
-            raise ModuleNotFoundError(
-                "To use the MDAnalysis from file parsing, MDAnalysis must be installed.")  # pragma: no cover
         if dtype is None:
-            u = MDAnalysisParser(trajectory, **parser_params)
-            return cls(u.delta_t, u.disp_3d, u._n_o, u.volume, **kwargs)
+            p = ASEParser(
+                trajectory, specie, time_step, step_skip, dt, dimension, distance_unit, specie_indices, masses, progress
+            )
+            return cls(p)
         elif dtype == 'identical':
-            u = [MDAnalysisParser(t, **parser_params) for t in trajectory]
-            n_o = np.zeros(u[0]._n_o.size)
-            for i in u:
-                n_o += i._n_o
-            return cls(u[0].delta_t, cls._stack_trajectories(u), n_o, u[0].volume, **kwargs)
-        else:
-            raise ValueError('The dtype specified was not recognised, please consult the kinisi documentation.')
+            u = [
+                ASEParser(
+                    f, specie, time_step, step_skip, dt, dimension, distance_unit, specie_indices, masses, progress
+                )
+                for f in trajectory
+            ]
+            p = u[0]
+            p.displacements = sc.concat([i.displacements for i in u], 'atom')
+            return cls(p)
 
-    @staticmethod
-    def _stack_trajectories(u: Union[MDAnalysisParser, PymatgenParser]) -> List[np.ndarray]:
-        """
-        If more than one trajectory is given, then they are stacked to give the appearance that there are
-        additional atoms in the trajectory.
-
-        :param u: Results from the parsing of each trajectory.
-
-        :return: The stacked displacement list.
-        """
-        joint_disp_3d = []
-        for i in range(len(u[0].disp_3d)):
-            disp = np.zeros((u[0].disp_3d[i].shape[0] * len(u), u[0].disp_3d[i].shape[1], u[0].disp_3d[i].shape[2]))
-            disp[:u[0].disp_3d[i].shape[0]] = u[0].disp_3d[i]
-            for j in range(1, len(u)):
-                disp[u[0].disp_3d[i].shape[0] * j:u[0].disp_3d[i].shape[0] * (j + 1)] = u[j].disp_3d[i]
-            joint_disp_3d.append(disp)
-        return joint_disp_3d
-
-    def posterior_predictive(self, posterior_predictive_params: Union[dict, None] = None):
+    def posterior_predictive(
+        self, n_posterior_samples: int = None, n_predictive_samples: int = 256, progress: bool = True
+    ):
         """
         Sample  the posterior predictive distribution. The shape of the resulting array will be
         `(n_posterior_samples * n_predictive_samples, start_dt)`.
-        
-        :params posterior_predictive_params: Parameters for the :py:func:`diffusion.posterior_predictive` method. 
+
+        :params posterior_predictive_params: Parameters for the :py:func:`diffusion.posterior_predictive` method.
             See the appropriate documentation for more guidence on this dictionary.
 
-        :return: Samples from the posterior predictive distribution. 
+        :return: Samples from the posterior predictive distribution.
         """
-        if posterior_predictive_params is None:
-            posterior_predictive_params = {}
-        return self._diff.posterior_predictive(**posterior_predictive_params)
+        return self.diff.posterior_predictive(n_posterior_samples, n_predictive_samples, progress)
 
     @property
-    def distribution(self) -> np.ndarray:
+    def n_atoms(self) -> int:
         """
-        :return: A distribution of samples for the linear relationship that can be used for easy
-        plotting of credible intervals.
+        :returns: The number of atoms in the trajectory.
         """
-        return self._diff.gradient.samples * self.dt[:, np.newaxis] + self._diff.intercept.samples
+        return self.trajectory.displacements.sizes['atom']
 
     @property
-    def dt(self) -> np.ndarray:
+    def intercept(self) -> sc.Variable:
         """
-        :return: Timestep values that have been sampled.
+        :return: The intercept of the linear relationship.
         """
-        return self._diff.dt
+        return self.diff.intercept
 
     @property
-    def dr(self) -> List['uravu.distribution.Distribution']:
+    def dt(self) -> sc.Variable:
         """
-        :return: A list of :py:class:`uravu.distribution.Distribution` objects that describe the Euclidean
-            displacement at each :py:attr:`dt`.
+        :return: The time intervals used for the mean-squared displacement.
         """
-        return self._diff.euclidian_displacements
+        return self._da.coords['time interval']
 
     @property
-    def ngp_max(self) -> float:
+    def da(self) -> sc.DataArray:
         """
-        :return: Position in dt where the non-Gaussian parameter is maximised.
+        :return: The mean-squared displacement data array.
         """
-        return self.dt[self._diff.ngp.argmax()]
-
-    @property
-    def intercept(self) -> 'uravu.distribution.Distribution':
-        """
-        :return: The distribution describing the intercept.
-        """
-        return self._diff.intercept
-
-    @property
-    def volume(self) -> float:
-        """
-        :return: Volume of system, in cubic angstrom.
-        """
-        return self._volume
+        return self._da
 
 
 def _flatten_list(this_list: list) -> list:
@@ -359,69 +307,20 @@ def _flatten_list(this_list: list) -> list:
     return [item for sublist in this_list for item in sublist]
 
 
-def _dict_to_group(h5file: 'h5py._hl.files.File', path: str, my_dict: dict):
+def _stack_trajectories(u: sc.Variable) -> list[np.ndarray]:
     """
-    A recursive function to help with saving to hdf5 file formats.
+    If more than one trajectory is given, then they are stacked to give the appearance that there are
+    additional atoms in the trajectory.
 
-    :param h5file: Open hdf5 file.
-    :param path: Path in the hdf5 file.
-    :param my_dict: Dict to make datasets from.
+    :param u: Results from the parsing of each trajectory.
+
+    :return: The stacked displacement list.
     """
-    for key, value in my_dict.items():
-        if isinstance(value, (np.ndarray, int, float, str, bytes)):
-            h5file[path + key] = value
-        elif isinstance(value, list):
-            for i, d in enumerate(value):
-                if isinstance(d, (np.ndarray, int, float, str, bytes)):
-                    h5file[path + key + f'/list{i}'] = d
-                elif isinstance(d, dict):
-                    _dict_to_group(h5file, path + key + f'/list{i}' + '/', d)
-        elif isinstance(value, dict):
-            _dict_to_group(h5file, path + key + '/', value)
-        elif value is None:
-            h5file[path + key] = 'NULL'
-        else:
-            raise ValueError(f'Cannot save {type(value)} type')
-
-
-def _group_to_dict(h5file: 'h5py._hl.files.File', path: str) -> dict:
-    """
-    A recursive function to load data from hdf5 files.
-
-    :param h5file: Open hdf5 file.
-    :param path: Path in the hdf5 file.
-
-    :return: A dictionary of the hdf5 groups and datasets.
-    """
-    import h5py
-    my_dict = {}
-    for key, value in h5file[path].items():
-        if isinstance(value, h5py._hl.dataset.Dataset):
-            if isinstance(value[()], (str, bytes)):
-                if value[()] == b'NULL':
-                    my_dict[key] = None
-                else:
-                    my_dict[key] = value[()]
-            else:
-                my_dict[key] = value[()]
-        elif isinstance(value, h5py._hl.group.Group):
-            key_list = list(h5file[path + key + '/'].keys())
-            if key_list[0][:4] == 'list':
-                my_dict[key] = []
-                for i in sorted([int(i[4:]) for i in key_list]):
-                    value = h5file[path + key + f'/list{i}']
-                    if isinstance(value, h5py._hl.dataset.Dataset):
-                        if isinstance(value[()], (str, bytes)):
-                            if value[()] == b'NULL':
-                                my_dict[key].append(None)
-                            else:
-                                my_dict[key].append(value[()])
-                        else:
-                            my_dict[key].append(value[()])
-                    elif isinstance(h5file[path + key + f'/list{i}'], h5py._hl.group.Group):
-                        my_dict[key].append(_group_to_dict(h5file, path + key + f'/list{i}'))
-            else:
-                my_dict[key] = _group_to_dict(h5file, path + key + '/')
-        else:
-            raise ValueError(f'Cannot save {type(value)} type')
-    return my_dict
+    joint_disp_3d = []
+    for i in range(len(u[0].disp_3d)):
+        disp = np.zeros((u[0].disp_3d[i].shape[0] * len(u), u[0].disp_3d[i].shape[1], u[0].disp_3d[i].shape[2]))
+        disp[: u[0].disp_3d[i].shape[0]] = u[0].disp_3d[i]
+        for j in range(1, len(u)):
+            disp[u[0].disp_3d[i].shape[0] * j : u[0].disp_3d[i].shape[0] * (j + 1)] = u[j].disp_3d[i]
+        joint_disp_3d.append(disp)
+    return joint_disp_3d
