@@ -50,7 +50,6 @@ class MDAnalysisParser(Parser):
         dimension: str = 'xyz',
         distance_unit: sc.Unit = sc.units.angstrom,
         specie_indices: VariableLikeType = None,
-        drift_indices: VariableLikeType = None,
         masses: VariableLikeType = None,
         progress: bool = True,
     ):
@@ -63,7 +62,15 @@ class MDAnalysisParser(Parser):
                 specie_indices, drift_indices = self.get_indices(structure, specie)
 
         super().__init__(
-            structure, coords, latt, specie, time_step, step_skip, dt, specie_indices, masses, dimension
+            coords=coords,
+            latt=latt, 
+            time_step=time_step, 
+            step_skip=step_skip, 
+            dt=dt, 
+            specie_indices=specie_indices, 
+            drift_indices=drift_indices, 
+            masses=masses, 
+            dimension=dimension
         )
 
     def get_structure_coords_latt(
@@ -103,6 +110,8 @@ class MDAnalysisParser(Parser):
             coords_l.append(np.dot(universe.atoms.positions, inv_matrix))
             latt_l.append(np.array(matrix))
 
+        coords_l.insert(0, coords_l[0])
+        latt_l.insert(0, latt_l[0])
         coords_l = np.array(coords_l)
         latt_l = np.array(latt_l)
 

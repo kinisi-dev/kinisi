@@ -74,15 +74,15 @@ class ASEParser(Parser):
                 specie_indices, drift_indices = self.get_indices(atoms, specie)
 
         super().__init__(
-            coords,
-            latt,
-            time_step,
-            step_skip,
-            dt,
-            specie_indices,
-            drift_indices,
-            masses,
-            dimension
+            coords=coords,
+            latt=latt,
+            time_step=time_step,
+            step_skip=step_skip,
+            dt=dt,
+            specie_indices=specie_indices,
+            drift_indices=drift_indices,
+            masses=masses,
+            dimension=dimension
         )
 
     def get_structure_coords_latt(

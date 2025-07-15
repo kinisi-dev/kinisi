@@ -196,7 +196,6 @@ class Analyzer:
                 masses=masses,
                 progress=progress,
             )
-            print(p)
             return cls(p)
         elif dtype == 'identical':
             u = [

@@ -65,7 +65,15 @@ class PymatgenParser(Parser):
                 specie_indices, drift_indices = self.get_indices(structure, specie)
 
         super().__init__(
-            structure, coords, latt, specie, time_step, step_skip, dt, specie_indices, masses, dimension
+            coords=coords,
+            latt=latt,
+            time_step=time_step,
+            step_skip=step_skip,
+            dt=dt,
+            specie_indices=specie_indices,
+            drift_indices=drift_indices,
+            masses=masses,
+            dimension=dimension
         )
 
     def get_structure_coords_latt(

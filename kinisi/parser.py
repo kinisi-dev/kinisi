@@ -277,7 +277,7 @@ class Parser:
         """
         diff = np.diff(coords.values, axis=0)
         images = np.tile(
-            [[0, 0, 0], [-1, 0, 0], [-1, -1, 0], [0, -1, 0], [0, 0, 1], [-1, 0, 1], [-1, -1, 1], [0, -1, 1]],
+            [[0, 0, 0], [-1, 0, 0], [-1, -1, 0], [0, -1, 0], [0, 0, -1], [-1, 0, -1], [-1, -1, -1], [0, -1, -1]],
             (diff.shape[0], diff.shape[1], 1, 1),
         )
 
@@ -289,7 +289,7 @@ class Parser:
         min_index = np.argmin(image_disps, axis=-1)
 
         min_vectors = cart_images[np.arange(images.shape[0])[:, None], np.arange(images.shape[1])[None, :], min_index]
-        min_vectors = sc.array(dims=['obs'] + list(coords.dims[1:]), values=min_vectors, unit=coords.unit)
+        min_vectors = sc.array(dims=['obs'] + list(coords.dims[1:]), values=min_vectors, unit=lattice.unit)
         disps = sc.cumsum(min_vectors, 'obs')
 
         return disps
