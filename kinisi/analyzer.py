@@ -36,7 +36,7 @@ class Analyzer:
     def __init__(self, trajectory: Parser) -> None:
         self.trajectory = trajectory
 
-    def _to_hdf5(self, filename: str) -> None:
+    def to_hdf5(self, filename: str) -> None:
         """
         Save the :py:class:`Analyzer` object to an HDF5 file.
 
@@ -55,7 +55,7 @@ class Analyzer:
         sc.DataGroup(group).save_hdf5(filename)
     
     @classmethod
-    def _from_hdf5(cls, filename: str) -> 'Analyzer':
+    def from_hdf5(cls, filename: str) -> 'Analyzer':
         """
         Load the :py:class:`Analyzer` object from an HDF5 file.
 
