@@ -8,13 +8,21 @@ Tests for the conductivity_analyzer module
 
 import os
 import unittest
+import warnings
 
-import scipp as sc
+from numpy.testing import assert_almost_equal
+import scipp as sc 
+from scipp.testing import assert_allclose
 from pymatgen.io.vasp import Xdatcar
 
 import kinisi
 from kinisi.analyzer import Analyzer
 from kinisi.conductivity_analyzer import ConductivityAnalyzer
+from kinisi.samples import Samples
+
+file_path = os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_XDATCAR.gz')
+xd = Xdatcar(file_path)
+da_params = {'specie': 'Li', 'time_step': 2.0 * sc.Unit('ps'), 'step_skip': 50 * sc.Unit('dimensionless')}
 
 
 class TestConductivityAnalyzer(unittest.TestCase):
@@ -23,7 +31,6 @@ class TestConductivityAnalyzer(unittest.TestCase):
     """
 
     def test_to_hdf5(cls):
-        xd = Xdatcar(os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_XDATCAR.gz'))
         da_params = {'specie': 'Li', 'time_step': 2.0 * sc.Unit('fs'), 'step_skip': 50 * sc.Unit('dimensionless')}
         analyzer = ConductivityAnalyzer._from_xdatcar(xd, **da_params)
         test_file = 'test_save.h5'
@@ -53,3 +60,23 @@ class TestConductivityAnalyzer(unittest.TestCase):
         assert type(analyzer) is type(analyzer_2)
         assert analyzer.trajectory._to_datagroup() == analyzer_3.trajectory._to_datagroup()
         assert type(analyzer) is type(analyzer_3)
+
+    def test_properties(self):
+        with warnings.catch_warnings(record=True) as w:
+            a = ConductivityAnalyzer.from_xdatcar(xd,ionic_charge=1 * sc.Unit('e'), **da_params)
+            assert_allclose(a.dt, a.da.coords['time interval'])
+            assert_almost_equal(a.mscd.values, a.da.values)
+            assert_almost_equal(a.mscd.variances, a.da.variances)
+
+    def test_diffusion(self):
+        with warnings.catch_warnings(record=True) as w:
+            a = ConductivityAnalyzer.from_xdatcar(xd,ionic_charge=1 * sc.Unit('e'), **da_params)
+            assert_allclose(a.dt, a.da.coords['time interval'])
+            assert_almost_equal(a.mscd.values, a.da.values)
+            assert_almost_equal(a.mscd.variances, a.da.variances)
+            a.conductivity(0 * sc.Unit('ps'), temperature=100 * sc.Unit('K'))
+            assert isinstance(a.sigma, Samples)
+            print(a.sigma.unit)
+            assert a.sigma.unit == sc.Unit('mS/cm')
+            assert a.flatchain['sigma'].shape == (3200,)
+            assert a.flatchain['intercept'].shape == (3200,)
