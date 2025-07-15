@@ -166,7 +166,6 @@ class Diffusion:
         :param start_dt: The time at which the diffusion regime begins.
         :param kwargs: Additional keyword arguments to pass to :py:func:`bayesian_regression`.
         """
-
         self.bayesian_regression(start_dt=sc.to_unit(start_dt, self.da.coords['time interval'].unit), **kwargs)
         _diffusion_coefficient = sc.to_unit(self.gradient / (2 * self.da.coords['dimensionality'].value), 'cm2/s')
         self._diffusion_coefficient = Samples(_diffusion_coefficient.values, _diffusion_coefficient.unit)
