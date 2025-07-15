@@ -72,7 +72,6 @@ class ASEParser(Parser):
         else:
             if specie is not None:
                 specie_indices, drift_indices = self.get_indices(atoms, specie)
-
         super().__init__(
             coords=coords,
             latt=latt,

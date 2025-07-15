@@ -101,7 +101,7 @@ class Parser:
         if is_orthorhombic(latt):
             disp = self.orthorhombic_calculate_displacements(coords, latt)
         else:
-            disp = self.non_orthorhombic_calculate_displacements(coords, latt)
+            disp = self.orthorhombic_calculate_displacements(coords, latt)
         self._disp = disp
         drift_corrected = self.correct_drift(disp)
 
@@ -354,7 +354,6 @@ def get_molecules(
     for i in range(coords.sizes['atom']):
         if i not in indices.values:
             drift_indices.append(i)
-
     if masses is None:
         weights = sc.ones_like(indices)
     elif len(masses.values) != len(indices['atom', 0]):

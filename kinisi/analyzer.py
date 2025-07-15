@@ -238,13 +238,31 @@ class Analyzer:
         """
         if dtype is None:
             p = ASEParser(
-                trajectory, specie, time_step, step_skip, dt, dimension, distance_unit, specie_indices, masses, progress
+                atoms=trajectory, 
+                specie=specie, 
+                time_step=time_step, 
+                step_skip=step_skip, 
+                dt=dt, 
+                dimension=dimension, 
+                distance_unit=distance_unit, 
+                specie_indices=specie_indices, 
+                masses=masses, 
+                progress=progress
             )
             return cls(p)
         elif dtype == 'identical':
             u = [
                 ASEParser(
-                    f, specie, time_step, step_skip, dt, dimension, distance_unit, specie_indices, masses, progress
+                    atoms=f, 
+                    specie=specie, 
+                    time_step=time_step, 
+                    step_skip=step_skip, 
+                    dt=dt, 
+                    dimension=dimension, 
+                    distance_unit=distance_unit, 
+                    specie_indices=specie_indices, 
+                    masses=masses, 
+                    progress=progress
                 )
                 for f in trajectory
             ]
