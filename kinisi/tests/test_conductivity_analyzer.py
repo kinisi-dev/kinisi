@@ -76,7 +76,6 @@ class TestConductivityAnalyzer(unittest.TestCase):
             assert_almost_equal(a.mscd.variances, a.da.variances)
             a.conductivity(0 * sc.Unit('ps'), temperature=100 * sc.Unit('K'))
             assert isinstance(a.sigma, Samples)
-            print(a.sigma.unit)
             assert a.sigma.unit == sc.Unit('mS/cm')
             assert a.flatchain['sigma'].shape == (3200,)
             assert a.flatchain['intercept'].shape == (3200,)
