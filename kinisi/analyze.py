@@ -14,7 +14,3 @@ These are all compatible with VASP Xdatcar output files, pymatgen structures and
 # Copyright (c) Andrew R. McCluskey and Benjamin J. Morgan
 # Distributed under the terms of the MIT License
 # author: Andrew R. McCluskey (arm61)
-
-from .diffusion_analyzer import DiffusionAnalyzer
-from .jump_diffusion_analyzer import JumpDiffusionAnalyzer
-from .conductivity_analyzer import ConductivityAnalyzer

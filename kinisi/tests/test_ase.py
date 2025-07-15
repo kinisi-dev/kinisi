@@ -16,6 +16,7 @@ import kinisi
 from kinisi import parser
 from kinisi.ase import ASEParser
 
+
 class TestASEParser(unittest.TestCase):
     """
     Unit tests for the pymatgen module

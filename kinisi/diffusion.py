@@ -47,7 +47,7 @@ class Diffusion:
             if value is None:
                 group[key] = sc.scalar(value=np.nan, dtype='float64')
         return sc.DataGroup(group)
-    
+
     @classmethod
     def _from_datagroup(cls, datagroup) -> 'Diffusion':
         """
@@ -57,7 +57,7 @@ class Diffusion:
         obj = cls.__new__(cls)
 
         for key, value in datagroup.items():
-            if type(value) == sc.Variable and value.ndim == 0 and np.isnan(value.value):
+            if isinstance(value, sc.Variable) and value.ndim == 0 and np.isnan(value.value):
                 setattr(obj, key, None)
             else:
                 setattr(obj, key, value)

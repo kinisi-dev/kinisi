@@ -213,7 +213,7 @@ class DiffusionAnalyzer(Analyzer):
             dimension=dimension,
             distance_unit=distance_unit,
             specie_indices=specie_indices,
-            masses= masses,
+            masses=masses,
             progress=progress,
         )
         p._da = calculate_msd(p.trajectory, progress)

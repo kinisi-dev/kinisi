@@ -7,7 +7,6 @@ It is used to extract the necessary data for diffusion analysis from ASE.
 # Distributed under the terms of the MIT License.
 # author: Josh Dunn (jd15489).
 
-
 import numpy as np
 import scipp as sc
 from scipp.typing import VariableLikeType
@@ -68,7 +67,7 @@ class ASEParser(Parser):
         atoms, coords, latt = self.get_structure_coords_latt(atoms, distance_unit, progress)
 
         if specie is None and specie_indices is None:
-                raise TypeError('Must specify specie or specie_indices as scipp VariableLikeType')
+            raise TypeError('Must specify specie or specie_indices as scipp VariableLikeType')
         else:
             if specie is not None:
                 specie_indices, drift_indices = self.get_indices(atoms, specie)
@@ -81,7 +80,7 @@ class ASEParser(Parser):
             specie_indices=specie_indices,
             drift_indices=drift_indices,
             masses=masses,
-            dimension=dimension
+            dimension=dimension,
         )
 
     def get_structure_coords_latt(

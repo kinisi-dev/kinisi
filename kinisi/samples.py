@@ -9,8 +9,8 @@ for handling samples, such as calculating the mean and standard deviation of the
 # author: Andrew R. McCluskey (arm61)
 
 import scipp as sc
-from uncertainties import ufloat
 from bs4 import BeautifulSoup
+from uncertainties import ufloat
 
 
 class Samples(sc.Variable):
@@ -41,16 +41,14 @@ class Samples(sc.Variable):
         # Update the preview value
         preview_div = soup.find('div', class_='sc-value-preview sc-preview')
         if preview_div:
-            preview_div.string = str(
-                ufloat(sc.mean(self).value, sc.std(self, ddof=1).value)
-            )
+            preview_div.string = str(ufloat(sc.mean(self).value, sc.std(self, ddof=1).value))
 
         # Update the type label
         obj_type_divs = soup.find_all('div', class_='sc-obj-type')
         if len(obj_type_divs) > 0:
             parts = obj_type_divs[-1].contents
             if parts:
-                parts[0].replace_with("kinisi.Samples")
+                parts[0].replace_with('kinisi.Samples')
 
         return str(soup)
 

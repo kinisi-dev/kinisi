@@ -11,17 +11,17 @@ are intended for internal use.
 # Distributed under the terms of the MIT License.
 # author: Andrew R. McCluskey (arm61), Harry Richardson (Harry-Rich) and Oskar G. Soulas (osoulas).
 
-from typing import Union
 import importlib
+from typing import Union
 
 import numpy as np
 import scipp as sc
 
 from kinisi.ase import ASEParser
+from kinisi.diffusion import Diffusion
 from kinisi.mdanalysis import MDAnalysisParser
 from kinisi.parser import Parser
 from kinisi.pymatgen import PymatgenParser
-from kinisi.diffusion import Diffusion
 
 
 class Analyzer:
@@ -43,7 +43,7 @@ class Analyzer:
         :param filename: The name of the file to save the object to.
         """
         group = self.__dict__.copy()
-        
+
         for key, value in group.items():
             if key == 'trajectory':
                 group[key] = self.trajectory._to_datagroup(hdf5=True)
@@ -51,9 +51,9 @@ class Analyzer:
                 group[key] = self.diff._to_datagroup()
             elif value is None:
                 group[key] = sc.scalar(value=np.nan, dtype='float64')
-        group['__class__'] = f"{self.__class__.__module__}.{self.__class__.__name__}"
+        group['__class__'] = f'{self.__class__.__module__}.{self.__class__.__name__}'
         sc.DataGroup(group).save_hdf5(filename)
-    
+
     @classmethod
     def from_hdf5(cls, filename: str) -> 'Analyzer':
         """
@@ -67,7 +67,7 @@ class Analyzer:
         module_name, class_name = class_path.rsplit('.', 1)
         module = importlib.import_module(module_name)
         klass = getattr(module, class_name)
-        
+
         obj = klass.__new__(klass)
 
         for key, value in datagroup.items():
@@ -76,7 +76,7 @@ class Analyzer:
             elif key == 'diff':
                 setattr(obj, key, Diffusion._from_datagroup(value))
             elif key != '__class__':
-                if type(value) == sc.Variable and value.ndim == 0 and np.isnan(value.value):
+                if isinstance(value, sc.Variable) and value.ndim == 0 and np.isnan(value.value):
                     setattr(obj, key, None)
                 else:
                     setattr(obj, key, value)
@@ -238,31 +238,31 @@ class Analyzer:
         """
         if dtype is None:
             p = ASEParser(
-                atoms=trajectory, 
-                specie=specie, 
-                time_step=time_step, 
-                step_skip=step_skip, 
-                dt=dt, 
-                dimension=dimension, 
-                distance_unit=distance_unit, 
-                specie_indices=specie_indices, 
-                masses=masses, 
-                progress=progress
+                atoms=trajectory,
+                specie=specie,
+                time_step=time_step,
+                step_skip=step_skip,
+                dt=dt,
+                dimension=dimension,
+                distance_unit=distance_unit,
+                specie_indices=specie_indices,
+                masses=masses,
+                progress=progress,
             )
             return cls(p)
         elif dtype == 'identical':
             u = [
                 ASEParser(
-                    atoms=f, 
-                    specie=specie, 
-                    time_step=time_step, 
-                    step_skip=step_skip, 
-                    dt=dt, 
-                    dimension=dimension, 
-                    distance_unit=distance_unit, 
-                    specie_indices=specie_indices, 
-                    masses=masses, 
-                    progress=progress
+                    atoms=f,
+                    specie=specie,
+                    time_step=time_step,
+                    step_skip=step_skip,
+                    dt=dt,
+                    dimension=dimension,
+                    distance_unit=distance_unit,
+                    specie_indices=specie_indices,
+                    masses=masses,
+                    progress=progress,
                 )
                 for f in trajectory
             ]

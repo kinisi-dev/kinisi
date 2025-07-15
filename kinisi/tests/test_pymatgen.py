@@ -6,8 +6,8 @@ Tests for the pymatgen module
 # Distributed under the terms of the MIT License.
 # author: Oskar G. Soulas (osoulas)
 
-import unittest
 import os
+import unittest
 
 import scipp as sc
 from pymatgen.io.vasp import Xdatcar
@@ -15,6 +15,7 @@ from pymatgen.io.vasp import Xdatcar
 import kinisi
 from kinisi import parser
 from kinisi.pymatgen import PymatgenParser
+
 
 class TestPymatgenParser(unittest.TestCase):
     """

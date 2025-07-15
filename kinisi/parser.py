@@ -38,7 +38,7 @@ EINSUM_DIMENSIONS = {
     'image': 'i',
     'row': 'r',
     'column': 'c',
-}  
+}
 
 
 class Parser:
@@ -75,7 +75,7 @@ class Parser:
         specie_indices: VariableLikeType = None,
         drift_indices: VariableLikeType = None,
         masses: VariableLikeType = None,
-        dimension: str = 'xyz'
+        dimension: str = 'xyz',
     ):
         self.time_step = time_step
         self.step_skip = step_skip
@@ -92,7 +92,9 @@ class Parser:
             else:
                 coords, indices, drift_indices = get_molecules(coords, specie_indices, masses)
         if drift_indices is None:
-            drift_indices = sc.array(dims=['atom'],values=[x for x in range(coords.sizes['atom']) if x not in specie_indices])
+            drift_indices = sc.array(
+                dims=['atom'], values=[x for x in range(coords.sizes['atom']) if x not in specie_indices]
+            )
 
         self.indices = indices
         self.drift_indices = drift_indices
@@ -226,9 +228,7 @@ class Parser:
         return coords, indices, drift_indices
 
     @staticmethod
-    def orthorhombic_calculate_displacements(
-        coords: VariableLikeType, lattice: VariableLikeType
-    ) -> VariableLikeType:
+    def orthorhombic_calculate_displacements(coords: VariableLikeType, lattice: VariableLikeType) -> VariableLikeType:
         """
         Calculate the absolute displacements of the atoms in the trajectory, when the cell is orthorhombic on all frames.
 
@@ -378,6 +378,7 @@ def get_molecules(
     )
 
     return new_coords, new_indices, new_drift_indices
+
 
 def _calculate_centers_of_mass(
     coords: VariableLikeType,
