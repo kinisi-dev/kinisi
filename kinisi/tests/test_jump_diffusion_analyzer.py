@@ -17,7 +17,7 @@ from pymatgen.io.vasp import Xdatcar
 
 import kinisi
 from kinisi.analyzer import Analyzer
-from kinisi.jump_diffusion_analyzer import JumpDiffusionAnalyzer
+from kinisi.analyze import JumpDiffusionAnalyzer
 from kinisi.samples import Samples
 
 file_path = os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_XDATCAR.gz')

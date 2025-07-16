@@ -17,7 +17,7 @@ from pymatgen.io.vasp import Xdatcar
 
 import kinisi
 from kinisi.analyzer import Analyzer
-from kinisi.diffusion_analyzer import DiffusionAnalyzer
+from kinisi.analyze import DiffusionAnalyzer
 from kinisi.samples import Samples
 
 

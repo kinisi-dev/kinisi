@@ -27,6 +27,27 @@ class Samples(sc.Variable):
     def __init__(self, values, unit=sc.units.dimensionless):
         super().__init__(values=values, unit=unit, dims=['samples'])
 
+    def _to_datagroup(self):
+        """
+        Convert the Samples object to a scipp DataGroup for compatibility with other scipp operations.
+
+        :return: A scipp DataGroup containing the Samples object.
+        """
+        group = {'values': self.values, 'unit': str(self.unit)}
+        group['__class__'] = f'{self.__class__.__module__}.{self.__class__.__name__}'
+        return sc.DataGroup(group)
+    
+    @classmethod
+    def _from_datagroup(cls, data_group):
+        """
+        Create a Samples object from a scipp DataGroup.
+
+        :param data_group: A scipp DataGroup containing the samples.
+
+        :return: A Samples object.
+        """
+        return cls(data_group['values'], unit=data_group['unit'])
+
     def _repr_html_(self) -> str:
         """
         This function augments the default HTML representation of a scipp Variable
