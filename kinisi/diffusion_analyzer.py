@@ -204,17 +204,17 @@ class DiffusionAnalyzer(Analyzer):
         :returns: The :py:class:`DiffusionAnalyzer` object with the mean-squared displacement calculated.
         """
         p = super()._from_ase(
-            trajectory,
-            specie,
-            time_step,
-            step_skip,
-            dtype,
-            dt,
-            dimension,
-            distance_unit,
-            specie_indices,
-            masses,
-            progress,
+            trajectory=trajectory,
+            specie=specie,
+            time_step=time_step,
+            step_skip=step_skip,
+            dtype=dtype,
+            dt=dt,
+            dimension=dimension,
+            distance_unit=distance_unit,
+            specie_indices=specie_indices,
+            masses=masses,
+            progress=progress,
         )
         p._da = calculate_msd(p.trajectory, progress)
         return p

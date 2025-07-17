@@ -1,5 +1,5 @@
 # """
-# Longer tests for application inluding MSD 
+# Longer tests for application inluding MSD
 # """
 
 # # Copyright (c) Andrew R. McCluskey and Benjamin J. Morgan

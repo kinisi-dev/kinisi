@@ -25,12 +25,10 @@ jobs:
         pip install pytest-cov
     - name: Lint code with ruff
       run: | 
-        ruff check .
-      continue-on-error: true
+        ruff check kinisi/*
     - name: Check code formatting with ruff
       run: |
-        ruff format --check .
-      continue-on-error: true
+        ruff format --check kinisi/*
     - name: Generate coverage report
       run: |
         pytest --cov-report xml --cov=.

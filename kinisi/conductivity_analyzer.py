@@ -173,7 +173,7 @@ class ConductivityAnalyzer(Analyzer):
         """
         :return: The mean-squared charge displacement.
         """
-        return self._da._data
+        return self._da.data
 
     @property
     def flatchain(self) -> sc.DataGroup:

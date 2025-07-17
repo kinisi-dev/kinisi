@@ -38,7 +38,7 @@ EINSUM_DIMENSIONS = {
     'image': 'i',
     'row': 'r',
     'column': 'c',
-}  
+}
 
 
 class Parser:
@@ -75,7 +75,7 @@ class Parser:
         specie_indices: VariableLikeType = None,
         drift_indices: VariableLikeType = None,
         masses: VariableLikeType = None,
-        dimension: str = 'xyz'
+        dimension: str = 'xyz',
     ):
         self.time_step = time_step
         self.step_skip = step_skip
@@ -91,6 +91,10 @@ class Parser:
                 indices = specie_indices
             else:
                 coords, indices, drift_indices = get_molecules(coords, specie_indices, masses)
+        if drift_indices is None:
+            drift_indices = sc.array(
+                dims=['atom'], values=[x for x in range(coords.sizes['atom']) if x not in specie_indices]
+            )
 
         self.indices = indices
         self.drift_indices = drift_indices
@@ -99,7 +103,7 @@ class Parser:
         if is_orthorhombic(latt):
             disp = self.orthorhombic_calculate_displacements(coords, latt)
         else:
-            disp = self.non_orthorhombic_calculate_displacements(coords, latt)
+            disp = self.orthorhombic_calculate_displacements(coords, latt)
         self._disp = disp
         drift_corrected = self.correct_drift(disp)
 
@@ -224,9 +228,7 @@ class Parser:
         return coords, indices, drift_indices
 
     @staticmethod
-    def orthorhombic_calculate_displacements(
-        coords: VariableLikeType, lattice: VariableLikeType
-    ) -> VariableLikeType:
+    def orthorhombic_calculate_displacements(coords: VariableLikeType, lattice: VariableLikeType) -> VariableLikeType:
         """
         Calculate the absolute displacements of the atoms in the trajectory, when the cell is orthorhombic on all frames.
 
@@ -277,7 +279,7 @@ class Parser:
         """
         diff = np.diff(coords.values, axis=0)
         images = np.tile(
-            [[0, 0, 0], [-1, 0, 0], [-1, -1, 0], [0, -1, 0], [0, 0, 1], [-1, 0, 1], [-1, -1, 1], [0, -1, 1]],
+            [[0, 0, 0], [-1, 0, 0], [-1, -1, 0], [0, -1, 0], [0, 0, -1], [-1, 0, -1], [-1, -1, -1], [0, -1, -1]],
             (diff.shape[0], diff.shape[1], 1, 1),
         )
 
@@ -289,7 +291,7 @@ class Parser:
         min_index = np.argmin(image_disps, axis=-1)
 
         min_vectors = cart_images[np.arange(images.shape[0])[:, None], np.arange(images.shape[1])[None, :], min_index]
-        min_vectors = sc.array(dims=['obs'] + list(coords.dims[1:]), values=min_vectors, unit=coords.unit)
+        min_vectors = sc.array(dims=['obs'] + list(coords.dims[1:]), values=min_vectors, unit=lattice.unit)
         disps = sc.cumsum(min_vectors, 'obs')
 
         return disps
@@ -352,7 +354,6 @@ def get_molecules(
     for i in range(coords.sizes['atom']):
         if i not in indices.values:
             drift_indices.append(i)
-
     if masses is None:
         weights = sc.ones_like(indices)
     elif len(masses.values) != len(indices['atom', 0]):
@@ -377,6 +378,7 @@ def get_molecules(
     )
 
     return new_coords, new_indices, new_drift_indices
+
 
 def _calculate_centers_of_mass(
     coords: VariableLikeType,

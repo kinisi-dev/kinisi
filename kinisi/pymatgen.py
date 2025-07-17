@@ -59,13 +59,21 @@ class PymatgenParser(Parser):
         structure, coords, latt = self.get_structure_coords_latt(structures, distance_unit, progress)
 
         if specie is None and specie_indices is None:
-                raise TypeError('Must specify specie or specie_indices as scipp VariableLikeType')
+            raise TypeError('Must specify specie or specie_indices as scipp VariableLikeType')
         else:
             if specie is not None:
                 specie_indices, drift_indices = self.get_indices(structure, specie)
 
         super().__init__(
-            structure, coords, latt, specie, time_step, step_skip, dt, specie_indices, masses, dimension
+            coords=coords,
+            latt=latt,
+            time_step=time_step,
+            step_skip=step_skip,
+            dt=dt,
+            specie_indices=specie_indices,
+            drift_indices=drift_indices,
+            masses=masses,
+            dimension=dimension,
         )
 
     def get_structure_coords_latt(

@@ -44,10 +44,12 @@ class Diffusion:
         """
         group = self.__dict__.copy()
         for key, value in group.items():
-            if value is None:
+            if isinstance(value, Samples):
+                group[key] = value._to_datagroup()
+            elif value is None:
                 group[key] = sc.scalar(value=np.nan, dtype='float64')
         return sc.DataGroup(group)
-    
+
     @classmethod
     def _from_datagroup(cls, datagroup) -> 'Diffusion':
         """
@@ -57,8 +59,10 @@ class Diffusion:
         obj = cls.__new__(cls)
 
         for key, value in datagroup.items():
-            if type(value) == sc.Variable and value.ndim == 0 and np.isnan(value.value):
+            if isinstance(value, sc.Variable) and value.ndim == 0 and np.isnan(value.value):
                 setattr(obj, key, None)
+            elif isinstance(value, sc.DataGroup) and value['__class__'] == 'kinisi.samples.Samples':
+                setattr(obj, key, Samples._from_datagroup(value))
             else:
                 setattr(obj, key, value)
 

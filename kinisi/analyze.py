@@ -11,10 +11,10 @@ These are all compatible with VASP Xdatcar output files, pymatgen structures and
 :py:mod:`MDAnalysis` package can handle.
 """
 
-# Copyright (c) Andrew R. McCluskey and Benjamin J. Morgan
+# Copyright (c) kinisi developers.
 # Distributed under the terms of the MIT License
 # author: Andrew R. McCluskey (arm61)
 
-from .diffusion_analyzer import DiffusionAnalyzer
-from .jump_diffusion_analyzer import JumpDiffusionAnalyzer
-from .conductivity_analyzer import ConductivityAnalyzer
+from kinisi.diffusion_analyzer import DiffusionAnalyzer
+from kinisi.jump_diffusion_analyzer import JumpDiffusionAnalyzer
+from kinisi.conductivity_analyzer import ConductivityAnalyzer
