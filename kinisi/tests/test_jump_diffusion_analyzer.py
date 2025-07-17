@@ -10,19 +10,20 @@ import os
 import unittest
 import warnings
 
-from numpy.testing import assert_almost_equal
 import scipp as sc
-from scipp.testing import assert_allclose
+from numpy.testing import assert_almost_equal
 from pymatgen.io.vasp import Xdatcar
+from scipp.testing import assert_allclose
 
 import kinisi
-from kinisi.analyzer import Analyzer
 from kinisi.analyze import JumpDiffusionAnalyzer
+from kinisi.analyzer import Analyzer
 from kinisi.samples import Samples
 
 file_path = os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_XDATCAR.gz')
 xd = Xdatcar(file_path)
 da_params = {'specie': 'Li', 'time_step': 2.0 * sc.Unit('ps'), 'step_skip': 50 * sc.Unit('dimensionless')}
+
 
 class TestJumpDiffusionAnalyzer(unittest.TestCase):
     """
@@ -60,14 +61,14 @@ class TestJumpDiffusionAnalyzer(unittest.TestCase):
         assert type(analyzer) is type(analyzer_3)
 
     def test_properties(self):
-        with warnings.catch_warnings(record=True) as w:
+        with warnings.catch_warnings(record=True) as _:
             a = JumpDiffusionAnalyzer.from_xdatcar(xd, **da_params)
             assert_allclose(a.dt, a.da.coords['time interval'])
             assert_almost_equal(a.mstd.values, a.da.values)
             assert_almost_equal(a.mstd.variances, a.da.variances)
 
     def test_diffusion(self):
-        with warnings.catch_warnings(record=True) as w:
+        with warnings.catch_warnings(record=True) as _:
             a = JumpDiffusionAnalyzer.from_xdatcar(xd, **da_params)
             assert_allclose(a.dt, a.da.coords['time interval'])
             assert_almost_equal(a.mstd.values, a.da.values)

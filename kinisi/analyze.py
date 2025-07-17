@@ -14,7 +14,3 @@ These are all compatible with VASP Xdatcar output files, pymatgen structures and
 # Copyright (c) kinisi developers.
 # Distributed under the terms of the MIT License
 # author: Andrew R. McCluskey (arm61)
-
-from kinisi.diffusion_analyzer import DiffusionAnalyzer
-from kinisi.jump_diffusion_analyzer import JumpDiffusionAnalyzer
-from kinisi.conductivity_analyzer import ConductivityAnalyzer

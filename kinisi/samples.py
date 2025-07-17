@@ -36,7 +36,7 @@ class Samples(sc.Variable):
         group = {'values': self.values, 'unit': str(self.unit)}
         group['__class__'] = f'{self.__class__.__module__}.{self.__class__.__name__}'
         return sc.DataGroup(group)
-    
+
     @classmethod
     def _from_datagroup(cls, data_group):
         """

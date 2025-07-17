@@ -10,14 +10,14 @@ import os
 import unittest
 import warnings
 
+import scipp as sc
 from numpy.testing import assert_almost_equal
-import scipp as sc 
-from scipp.testing import assert_allclose
 from pymatgen.io.vasp import Xdatcar
+from scipp.testing import assert_allclose
 
 import kinisi
-from kinisi.analyzer import Analyzer
 from kinisi.analyze import ConductivityAnalyzer
+from kinisi.analyzer import Analyzer
 from kinisi.samples import Samples
 
 file_path = os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_XDATCAR.gz')
@@ -62,15 +62,15 @@ class TestConductivityAnalyzer(unittest.TestCase):
         assert type(analyzer) is type(analyzer_3)
 
     def test_properties(self):
-        with warnings.catch_warnings(record=True) as w:
-            a = ConductivityAnalyzer.from_xdatcar(xd,ionic_charge=1 * sc.Unit('e'), **da_params)
+        with warnings.catch_warnings(record=True) as _:
+            a = ConductivityAnalyzer.from_xdatcar(xd, ionic_charge=1 * sc.Unit('e'), **da_params)
             assert_allclose(a.dt, a.da.coords['time interval'])
             assert_almost_equal(a.mscd.values, a.da.values)
             assert_almost_equal(a.mscd.variances, a.da.variances)
 
     def test_diffusion(self):
-        with warnings.catch_warnings(record=True) as w:
-            a = ConductivityAnalyzer.from_xdatcar(xd,ionic_charge=1 * sc.Unit('e'), **da_params)
+        with warnings.catch_warnings(record=True) as _:
+            a = ConductivityAnalyzer.from_xdatcar(xd, ionic_charge=1 * sc.Unit('e'), **da_params)
             assert_allclose(a.dt, a.da.coords['time interval'])
             assert_almost_equal(a.mscd.values, a.da.values)
             assert_almost_equal(a.mscd.variances, a.da.variances)

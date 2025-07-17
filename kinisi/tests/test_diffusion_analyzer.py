@@ -10,19 +10,19 @@ import os
 import unittest
 import warnings
 
-from numpy.testing import assert_almost_equal
 import scipp as sc
-from scipp.testing import assert_allclose
+from numpy.testing import assert_almost_equal
 from pymatgen.io.vasp import Xdatcar
+from scipp.testing import assert_allclose
 
 import kinisi
-from kinisi.analyzer import Analyzer
 from kinisi.analyze import DiffusionAnalyzer
+from kinisi.analyzer import Analyzer
 from kinisi.samples import Samples
-
 
 xd = Xdatcar(os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_XDATCAR.gz'))
 da_params = {'specie': 'Li', 'time_step': 2.0 * sc.Unit('fs'), 'step_skip': 50 * sc.Unit('dimensionless')}
+
 
 class TestDiffusionAnalyzer(unittest.TestCase):
     """

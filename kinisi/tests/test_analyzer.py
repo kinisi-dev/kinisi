@@ -9,22 +9,22 @@ Tests for the analyzer module
 import os
 import unittest
 
-from numpy.testing import assert_almost_equal
-import scipp as sc
-from pymatgen.io.vasp import Xdatcar
-from ase.io import Trajectory
 import MDAnalysis as mda
+import scipp as sc
+from ase.io import Trajectory
+from pymatgen.io.vasp import Xdatcar
 
 import kinisi
 from kinisi.analyzer import Analyzer, _flatten_list
-from kinisi.samples import Samples
 
 file_path = os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_XDATCAR.gz')
 xd = Xdatcar(file_path)
 da_params = {'specie': 'Li', 'time_step': 2.0 * sc.Unit('ps'), 'step_skip': 50 * sc.Unit('dimensionless')}
-md = mda.Universe(os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_LAMMPS.data'),
-                  os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_LAMMPS.dcd'),
-                  format='LAMMPS')
+md = mda.Universe(
+    os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_LAMMPS.data'),
+    os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_LAMMPS.dcd'),
+    format='LAMMPS',
+)
 db_params = {'specie': '1', 'time_step': 0.005 * sc.Unit('ps'), 'step_skip': 250 * sc.Unit('dimensionless')}
 ase_file_path = os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_ase.traj')
 traj = Trajectory(ase_file_path, 'r')
