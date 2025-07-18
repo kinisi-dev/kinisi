@@ -22,3 +22,4 @@ Here we will try and list publications that have used `kinisi` (if you would lik
 18. Ko, H. J., Cho, M. H., Kim, H.-K., Scanlon, D. O., Park, H. J., & Choi, Y.-S., *J. Alloys Compd.*, **1027**, 180614, 2025. doi:[10.1016/j.jallcom.2025.180614](https://doi.org/10.1016/j.jallcom.2025.180614).
 19. Arber, A. N., Vikram, Mocanu, F. C., & Islam, M. S., *Chem. Mater.*, **37**, 4416-4424, 2025. doi:[10.1021/acs.chemmater.5c00503](https://doi.org/10.1021/acs.chemmater.5c00503). 
 20. Zills, F., Agarwal, S., Goncalves, T., Gupta, S., Fako, E., Han, S., Mueller, I., Holm, C., & De, S., *ChemRvix*, 2025. doi:[10.26434/chemrxiv-2025-0v720](https://doi.org/10.26434/chemrxiv-2025-0v720).
+21. Christensen, R. & Smedskjaer, M. M., *ChemRvix*, 2025. doi:[10.26434/chemrxiv-2025-0v720](https://doi.org/10.26434/chemrxiv-2025-7csf2).
