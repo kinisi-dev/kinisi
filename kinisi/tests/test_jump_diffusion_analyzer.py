@@ -12,6 +12,7 @@ import warnings
 
 import scipp as sc
 from numpy.testing import assert_almost_equal
+from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.io.vasp import Xdatcar
 from scipp.testing import assert_allclose
 
@@ -22,6 +23,7 @@ from kinisi.samples import Samples
 
 file_path = os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_XDATCAR.gz')
 xd = Xdatcar(file_path)
+ase_traj = [AseAtomsAdaptor.get_atoms(struct) for struct in xd.structures]
 da_params = {'specie': 'Li', 'time_step': 2.0 * sc.Unit('ps'), 'step_skip': 50 * sc.Unit('dimensionless')}
 
 
@@ -66,6 +68,10 @@ class TestJumpDiffusionAnalyzer(unittest.TestCase):
             assert_allclose(a.dt, a.da.coords['time interval'])
             assert_almost_equal(a.mstd.values, a.da.values)
             assert_almost_equal(a.mstd.variances, a.da.variances)
+            a_ase = JumpDiffusionAnalyzer.from_ase(ase_traj, **da_params)
+            assert_allclose(a_ase.dt, a_ase.da.coords['time interval'])
+            assert_almost_equal(a_ase.mstd.values, a_ase.da.values)
+            assert_almost_equal(a_ase.mstd.variances, a_ase.da.variances)
 
     def test_diffusion(self):
         with warnings.catch_warnings(record=True) as _:
