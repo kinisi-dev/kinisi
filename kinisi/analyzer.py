@@ -350,14 +350,21 @@ class Analyzer:
         """
         :return: The time intervals used for the mean-squared displacement.
         """
-        return self._da.coords['time interval']
+        return self.da.coords['time interval']
 
     @property
     def da(self) -> sc.DataArray:
         """
         :return: The mean-squared displacement data array.
         """
-        return self._da
+        return self._dg['da']
+
+    @property
+    def dg(self) -> sc.DataGroup:
+        """
+        :return: The data group containing the analysis information.
+        """
+        return self._dg
 
 
 def _flatten_list(this_list: list) -> list:

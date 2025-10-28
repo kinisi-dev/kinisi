@@ -52,7 +52,8 @@ dev = [
     'pytest-cov',
     'ase',
     'h5py',
-    'ruff'
+    'ruff',
+    'pre-commit',
 ]
 
 docs = [
@@ -85,6 +86,7 @@ source = ['kinisi']
 
 [tool.ruff]
 line-length = 120
+extend-exclude = ["docs"]
 
 # Assume Python 3.10 or higher
 target-version = "py310"

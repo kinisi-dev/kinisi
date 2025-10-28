@@ -103,11 +103,10 @@ class TestCalculateMsd(unittest.TestCase):
             ),
             coords={
                 'time interval': PARSER.dt,
-                'dimensionality': PARSER.dimensionality,
                 'n_samples': sc.array(values=[8.0, 4.0, 8 / 3, 2], dims=['time interval'], unit='dimensionless'),
             },
         )
-        testing.assert_allclose(result, expected)
+        testing.assert_allclose(result['da'], expected)
 
     def test_calculate_msd_progress(self):
         """
@@ -122,11 +121,10 @@ class TestCalculateMsd(unittest.TestCase):
             ),
             coords={
                 'time interval': PARSER.dt,
-                'dimensionality': PARSER.dimensionality,
                 'n_samples': sc.array(values=[8.0, 4.0, 8 / 3, 2], dims=['time interval'], unit='dimensionless'),
             },
         )
-        testing.assert_allclose(result, expected)
+        testing.assert_allclose(result['da'], expected)
 
 
 class TestCalculateMstd(unittest.TestCase):
@@ -147,11 +145,10 @@ class TestCalculateMstd(unittest.TestCase):
             ),
             coords={
                 'time interval': PARSER.dt['time interval', :-1],
-                'dimensionality': PARSER.dimensionality,
                 'n_samples': sc.array(values=[8 / 2, 4 / 2, 8 / 6], dims=['time interval'], unit='dimensionless'),
             },
         )
-        testing.assert_allclose(result, expected)
+        testing.assert_allclose(result['da'], expected)
 
     def test_calculate_mstd_progress(self):
         """
@@ -166,11 +163,10 @@ class TestCalculateMstd(unittest.TestCase):
             ),
             coords={
                 'time interval': PARSER.dt['time interval', :-1],
-                'dimensionality': PARSER.dimensionality,
                 'n_samples': sc.array(values=[8 / 2, 4 / 2, 8 / 6], dims=['time interval'], unit='dimensionless'),
             },
         )
-        testing.assert_allclose(result, expected)
+        testing.assert_allclose(result['da'], expected)
 
     def test_calculate_mstd_ionic_charge(self):
         """
@@ -186,9 +182,7 @@ class TestCalculateMstd(unittest.TestCase):
             ),
             coords={
                 'time interval': PARSER.dt['time interval', :-1],
-                'dimensionality': PARSER.dimensionality,
                 'n_samples': sc.array(values=[8 / 2, 4 / 2, 8 / 6], dims=['time interval'], unit='dimensionless'),
             },
         )
-        print(result.values)
-        testing.assert_allclose(result, expected)
+        testing.assert_allclose(result['da'], expected)

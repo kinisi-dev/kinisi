@@ -31,7 +31,7 @@ class DiffusionAnalyzer(Analyzer):
 
     def __init__(self, trajectory: Parser) -> None:
         super().__init__(trajectory)
-        self._da = None
+        self._dg = None
 
     @classmethod
     def from_xdatcar(
@@ -93,7 +93,7 @@ class DiffusionAnalyzer(Analyzer):
             masses,
             progress,
         )
-        p._da = calculate_msd(p.trajectory, progress)
+        p._dg = calculate_msd(p.trajectory, progress)
         return p
 
     @classmethod
@@ -156,7 +156,7 @@ class DiffusionAnalyzer(Analyzer):
             masses,
             progress,
         )
-        p._da = calculate_msd(p.trajectory, progress)
+        p._dg = calculate_msd(p.trajectory, progress)
         return p
 
     @classmethod
@@ -216,7 +216,7 @@ class DiffusionAnalyzer(Analyzer):
             masses=masses,
             progress=progress,
         )
-        p._da = calculate_msd(p.trajectory, progress)
+        p._dg = calculate_msd(p.trajectory, progress)
         return p
 
     def diffusion(
@@ -244,7 +244,7 @@ class DiffusionAnalyzer(Analyzer):
         :param progress: Whether to show the progress bar. Optional, default is :py:attr:`True`.
         :param random_state: The random state to use for the MCMC. Optional, default is :py:attr:`None`.
         """
-        self.diff = Diffusion(da=self._da)
+        self.diff = Diffusion(dg=self.dg)
         self.diff._diffusion(
             start_dt,
             cond_max=cond_max,
@@ -265,11 +265,11 @@ class DiffusionAnalyzer(Analyzer):
         """
         if self.diff.intercept is not None:
             return (
-                self.diff.gradient.values * self._da.coords['time interval'].values[:, np.newaxis]
+                self.diff.gradient.values * self.da.coords['time interval'].values[:, np.newaxis]
                 + self.diff.intercept.values
             )
         else:
-            return self.diff.gradient.values * self._da.coords['time interval'].values[:, np.newaxis]
+            return self.diff.gradient.values * self.da.coords['time interval'].values[:, np.newaxis]
 
     @property
     def D(self) -> VariableLikeType:
@@ -283,7 +283,7 @@ class DiffusionAnalyzer(Analyzer):
         """
         :return: The mean-squared displacement.
         """
-        return self._da.data
+        return self.da.data
 
     @property
     def flatchain(self) -> sc.DataGroup:

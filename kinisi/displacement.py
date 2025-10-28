@@ -44,15 +44,14 @@ def calculate_msd(p: parser.Parser, progress: bool = True) -> sc.Variable:
         msd.append(m)
         msd_var.append(v)
         n_samples.append(n)
-
-    return sc.DataArray(
+    da = sc.DataArray(
         data=sc.Variable(dims=['time interval'], values=np.array(msd, dtype='float64'), variances=msd_var, unit=s.unit),
         coords={
             'time interval': p.dt['time interval', : len(msd)],
             'n_samples': sc.array(dims=['time interval'], values=n_samples),
-            'dimensionality': p.dimensionality,
         },
     )
+    return sc.DataGroup({'da': da, 'dimensionality': p.dimensionality})
 
 
 def calculate_mstd(
@@ -100,15 +99,14 @@ def calculate_mstd(
         mstd.append(np.float64(m))
         mstd_var.append(np.float64(v))
         n_samples.append(n)
-
-    return sc.DataArray(
+    da = sc.DataArray(
         data=sc.Variable(dims=['time interval'], values=mstd, variances=mstd_var, unit=s.unit),
         coords={
             'time interval': p.dt['time interval', : len(mstd)],
             'n_samples': sc.array(dims=['time interval'], values=n_samples),
-            'dimensionality': p.dimensionality,
         },
     )
+    return sc.DataGroup({'da': da, 'dimensionality': p.dimensionality})
 
 
 def _consolidate_system_particles(disp: sc.DataArray, system_particles: int = 1) -> sc.DataArray:

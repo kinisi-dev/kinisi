@@ -32,7 +32,7 @@ class ConductivityAnalyzer(Analyzer):
 
     def __init__(self, trajectory: Parser) -> None:
         super().__init__(trajectory)
-        self._da = None
+        self._dg = None
 
     @classmethod
     def from_xdatcar(
@@ -101,7 +101,7 @@ class ConductivityAnalyzer(Analyzer):
             masses,
             progress,
         )
-        p._da = calculate_mstd(p.trajectory, system_particles, ionic_charge, progress)
+        p._dg = calculate_mstd(p.trajectory, system_particles, ionic_charge, progress)
         return p
 
     @classmethod
@@ -173,7 +173,7 @@ class ConductivityAnalyzer(Analyzer):
             masses=masses,
             progress=progress,
         )
-        p._da = calculate_mstd(p.trajectory, system_particles, ionic_charge, progress)
+        p._dg = calculate_mstd(p.trajectory, system_particles, ionic_charge, progress)
         return p
 
     @classmethod
@@ -243,7 +243,7 @@ class ConductivityAnalyzer(Analyzer):
             masses,
             progress,
         )
-        p._da = calculate_mstd(p.trajectory, system_particles, ionic_charge, progress)
+        p._dg = calculate_mstd(p.trajectory, system_particles, ionic_charge, progress)
         return p
 
     def conductivity(
@@ -274,7 +274,7 @@ class ConductivityAnalyzer(Analyzer):
         :param progress: Whether to show the progress bar. Optional, default is :py:attr:`True`.
         :param random_state: The random state to use for the MCMC. Optional, default is :py:attr:`None`.
         """
-        self.diff = Diffusion(da=self._da)
+        self.diff = Diffusion(dg=self.dg)
         self.diff._conductivity(
             start_dt,
             temperature,
@@ -297,11 +297,11 @@ class ConductivityAnalyzer(Analyzer):
         """
         if self.diff.intercept is not None:
             return (
-                self.diff.gradient.values * self._da.coords['time interval'].values[:, np.newaxis]
+                self.diff.gradient.values * self.da.coords['time interval'].values[:, np.newaxis]
                 + self.diff.intercept.values
             )
         else:
-            return self.diff.gradient.values * self._da.coords['time interval'].values[:, np.newaxis]
+            return self.diff.gradient.values * self.da.coords['time interval'].values[:, np.newaxis]
 
     @property
     def sigma(self) -> VariableLikeType:
@@ -315,7 +315,7 @@ class ConductivityAnalyzer(Analyzer):
         """
         :return: The mean-squared charge displacement.
         """
-        return self._da.data
+        return self.da.data
 
     @property
     def flatchain(self) -> sc.DataGroup:

@@ -7,7 +7,6 @@ Tests for parser module
 # author: Andrew R. McCluskey (arm61), Josh Dunn (jd15489) & Oskar G. Soulas (osoulas)
 # pylint: disable=R0201
 
-import os
 import unittest
 
 import MDAnalysis as mda
@@ -16,8 +15,8 @@ import pytest
 import scipp as sc
 from numpy.testing import assert_almost_equal, assert_equal
 
-import kinisi
 from kinisi import parser
+from kinisi.tests import TEST_FILE_PATH
 
 
 class mda_universe_generator:
@@ -208,7 +207,7 @@ class test_is_orthorhombic(unittest.TestCase):
         assert_almost_equal(disp.values, test_disp.values)
 
 
-dg = sc.io.load_hdf5(os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_drift.h5'))
+dg = sc.io.load_hdf5(TEST_FILE_PATH / 'example_drift.h5')
 coords = dg['coords']
 latt = dg['latt']
 time_step = dg['time_step']

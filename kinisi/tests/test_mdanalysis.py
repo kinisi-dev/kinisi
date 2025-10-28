@@ -6,7 +6,6 @@ Tests for the mdanalysis module
 # Distributed under the terms of the MIT License.
 # author: Oskar G. Soulas (osoulas)
 
-import os
 import unittest
 
 import MDAnalysis as mda
@@ -15,9 +14,9 @@ import scipp as sc
 from numpy.testing import assert_almost_equal
 from scipp.testing.assertions import assert_allclose, assert_identical
 
-import kinisi
 from kinisi import parser
 from kinisi.mdanalysis import MDAnalysisParser
+from kinisi.tests import TEST_FILE_PATH
 
 
 class TestMDAnalysisParser(unittest.TestCase):
@@ -27,8 +26,8 @@ class TestMDAnalysisParser(unittest.TestCase):
 
     def test_mdanalysis_datagroup_round_trip(self):
         xd = mda.Universe(
-            os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_LAMMPS.data'),
-            os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_LAMMPS.dcd'),
+            TEST_FILE_PATH / 'example_LAMMPS.data',
+            TEST_FILE_PATH / 'example_LAMMPS.dcd',
             format='LAMMPS',
         )
         da_params = {'specie': '1', 'time_step': 0.005 * sc.Unit('fs'), 'step_skip': 250 * sc.Unit('dimensionless')}
@@ -43,8 +42,8 @@ class TestMDAnalysisParser(unittest.TestCase):
 
     def test_mda_init(self):
         xd = mda.Universe(
-            os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_LAMMPS.data'),
-            os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_LAMMPS.dcd'),
+            TEST_FILE_PATH / 'example_LAMMPS.data',
+            TEST_FILE_PATH / 'example_LAMMPS.dcd',
             format='LAMMPS',
         )
         da_params = {'specie': '1', 'time_step': 0.005, 'step_skip': 250}
@@ -57,8 +56,8 @@ class TestMDAnalysisParser(unittest.TestCase):
 
     def test_mda_init_with_indices(self):
         xd = mda.Universe(
-            os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_LAMMPS.data'),
-            os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_LAMMPS.dcd'),
+            TEST_FILE_PATH / 'example_LAMMPS.data',
+            TEST_FILE_PATH / 'example_LAMMPS.dcd',
             format='LAMMPS',
         )
         specie_indices = sc.array(dims=['particle'], values=[208, 212], unit=sc.units.dimensionless)

@@ -66,9 +66,9 @@ Ready to contribute? Here's how to set up `kinisi` for local development.
    Now you can make your changes locally.
 
 5. When you're done making changes, auto format the code and check that your changes pass the unit
-   tests and confirms to PEP 8::
+   tests::
 
-    $ yapf -ir kinisi
+    $ pre-commit run --all-files
     $ pytest
 
 6. Commit your changes and push your branch to GitHub::

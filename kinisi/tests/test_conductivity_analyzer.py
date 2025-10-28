@@ -17,22 +17,22 @@ from numpy.testing import assert_almost_equal
 from pymatgen.io.vasp import Xdatcar
 from scipp.testing import assert_allclose
 
-import kinisi
 from kinisi.analyze import ConductivityAnalyzer
 from kinisi.analyzer import Analyzer
 from kinisi.samples import Samples
+from kinisi.tests import TEST_FILE_PATH
 
-file_path = os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_XDATCAR.gz')
+file_path = TEST_FILE_PATH / 'example_XDATCAR.gz'
 xd = Xdatcar(file_path)
 da_params = {'specie': 'Li', 'time_step': 2.0 * sc.Unit('ps'), 'step_skip': 50 * sc.Unit('dimensionless')}
 
-ase_file_path = os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_ase.traj')
+ase_file_path = TEST_FILE_PATH / 'example_ase.traj'
 traj = Trajectory(ase_file_path, 'r')
 ase_params = {'specie': 'Li', 'time_step': 1.0 * 1e-3 * sc.Unit('fs'), 'step_skip': 1 * sc.Unit('dimensionless')}
 
 mda_universe = mda.Universe(
-    os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_LAMMPS.data'),
-    os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_LAMMPS.dcd'),
+    TEST_FILE_PATH / 'example_LAMMPS.data',
+    TEST_FILE_PATH / 'example_LAMMPS.dcd',
     format='LAMMPS',
 )
 mda_params = {'specie': '1', 'time_step': 0.005 * sc.Unit('fs'), 'step_skip': 250 * sc.Unit('dimensionless')}
@@ -53,14 +53,14 @@ class TestConductivityAnalyzer(unittest.TestCase):
         assert file_exists
 
     def test_load_hdf(cls):
-        test_file = os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_DiffusionAnalyzer.h5')
+        test_file = TEST_FILE_PATH / 'example_DiffusionAnalyzer.h5'
         analyzer = ConductivityAnalyzer.from_hdf5(test_file)
         analyzer_2 = Analyzer.from_hdf5(test_file)
         assert analyzer.trajectory._to_datagroup() == analyzer_2.trajectory._to_datagroup()
         assert type(analyzer) is type(analyzer_2)
 
     def test_round_trip_hdf5(self):
-        xd = Xdatcar(os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_XDATCAR.gz'))
+        xd = Xdatcar(TEST_FILE_PATH / 'example_XDATCAR.gz')
         da_params = {'specie': 'Li', 'time_step': 2.0 * sc.Unit('fs'), 'step_skip': 50 * sc.Unit('dimensionless')}
         analyzer = ConductivityAnalyzer._from_xdatcar(xd, **da_params)
         test_file = 'test_save.h5'

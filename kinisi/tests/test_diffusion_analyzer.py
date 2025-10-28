@@ -15,12 +15,12 @@ from numpy.testing import assert_almost_equal
 from pymatgen.io.vasp import Xdatcar
 from scipp.testing import assert_allclose
 
-import kinisi
 from kinisi.analyze import DiffusionAnalyzer
 from kinisi.analyzer import Analyzer
 from kinisi.samples import Samples
+from kinisi.tests import TEST_FILE_PATH
 
-xd = Xdatcar(os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_XDATCAR.gz'))
+xd = Xdatcar(TEST_FILE_PATH / 'example_XDATCAR.gz')
 da_params = {'specie': 'Li', 'time_step': 2.0 * sc.Unit('fs'), 'step_skip': 50 * sc.Unit('dimensionless')}
 
 
@@ -38,7 +38,7 @@ class TestDiffusionAnalyzer(unittest.TestCase):
         assert file_exists
 
     def test_load_hdf(cls):
-        test_file = os.path.join(os.path.dirname(kinisi.__file__), 'tests/inputs/example_DiffusionAnalyzer.h5')
+        test_file = TEST_FILE_PATH / 'example_DiffusionAnalyzer.h5'
         analyzer = DiffusionAnalyzer.from_hdf5(test_file)
         analyzer_2 = Analyzer.from_hdf5(test_file)
         assert analyzer.trajectory._to_datagroup() == analyzer_2.trajectory._to_datagroup()
