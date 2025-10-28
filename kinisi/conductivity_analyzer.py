@@ -108,7 +108,7 @@ class ConductivityAnalyzer(Analyzer):
     def from_ase(
         cls,
         trajectory: Union['ase.io.trajectory.Trajectory', list['ase.io.trajectory.Trajectory']],
-        specie: Union[str, 'ase.Atom', None] = None,
+        specie: Union[str, 'ase.Atom', list['kinisi.species.Species'], None] = None,
         time_step: VariableLikeType = None,
         step_skip: VariableLikeType = None,
         ionic_charge: VariableLikeType = None,
@@ -126,6 +126,7 @@ class ConductivityAnalyzer(Analyzer):
 
         :param trajectory: The ASE trajectory or list of ASE trajectories to parse.
         :param specie: Specie to calculate conductivity for as a String, e.g. :py:attr:`'Li'`, or an :py:class:`ase.Atom` object.
+            This can also be a list of :py:class:`kinisi.species.Species` objects.
         :param time_step: The input simulation time step, i.e., the time step for the molecular dynamics integrator. Note,
             that this must be given as a :py:mod:`scipp`-type scalar. The unit used for the time_step, will be the unit
             that is use for the time interval values.
@@ -156,6 +157,9 @@ class ConductivityAnalyzer(Analyzer):
 
         :returns: The :py:class:`ConductivityAnalyzer` object with the mean-squared charge displacement calculated.
         """
+        if isinstance(specie, list):
+            ionic_charge = sc.concat([sc.scalar(s.charge, unit='e') * sc.ones(dims=['particle'], shape=(len(s.indices),)) for s in specie], 'particle')
+
         p = super()._from_ase(
             trajectory=trajectory,
             specie=specie,

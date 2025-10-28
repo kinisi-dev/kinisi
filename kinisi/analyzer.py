@@ -234,7 +234,7 @@ class Analyzer:
     def _from_ase(
         cls,
         trajectory: Union['ase.io.trajectory.Trajectory', list['ase.io.trajectory.Trajectory']],
-        specie: Union[str, 'ase.Atom', None],
+        specie: Union[str, 'ase.Atom', list['kinisi.species.Species'], None],
         time_step: sc.Variable,
         step_skip: sc.Variable,
         dtype: str | None = None,
@@ -246,9 +246,35 @@ class Analyzer:
         progress: bool = True,
     ) -> 'Analyzer':
         """
-        Constructs the necessary :py:mod:`kinisi` objects for analysis from a single or a list of
+        Constructs the necessary :py_mod:`kinisi` objects for analysis from a single or a list of
         :py:class:`ase.io.trajectory.Trajectory` objects.
         """
+        if isinstance(specie, list) and dtype is None:
+            parsers = [
+                ASEParser(
+                    atoms=trajectory,
+                    specie=None,
+                    time_step=time_step,
+                    step_skip=step_skip,
+                    dt=dt,
+                    dimension=dimension,
+                    distance_unit=distance_unit,
+                    specie_indices=sc.array(
+                        dims=['particle', 'atoms in particle'], values=s.indices, unit=sc.Unit('dimensionless')
+                    ),
+                    masses=sc.array(dims=['atoms in particle'], values=s.masses),
+                    progress=progress,
+                )
+                for s in specie
+            ]
+            p = parsers[0]
+            print("Shapes before concatenation:")
+            for i, parser in enumerate(parsers):
+                print(f"  Parser {i}: {parser.displacements.shape}")
+            p.displacements = sc.concat([i.displacements for i in parsers], 'particle')
+            print(f"Shape after concatenation: {p.displacements.shape}")
+            return cls(p)
+        
         if dtype is None:
             p = ASEParser(
                 atoms=trajectory,

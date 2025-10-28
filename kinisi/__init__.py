@@ -1,6 +1,7 @@
 __version__ = '2.0.2'
 
 from .due import Doi, due
+from .species import Species
 
 due.cite(
     Doi('https://doi.org/10.21105/joss.05984'),
