@@ -77,7 +77,7 @@ class TestArrhenius(unittest.TestCase):
         assert isinstance(arr.activation_energy, sc.Variable)
         assert isinstance(arr.preexponential_factor, sc.Variable)
 
-    def test_init_priros(self):
+    def test_init_priors(self):
         """
         Test the initialisation of Arrhenius class with priors
         """

@@ -60,8 +60,8 @@ class FittingBase:
                 raise ValueError(
                     f'Priors must be a list of length {len(self.parameter_names)}, got {len(priors)} instead.'
                 )
-            if not all([isinstance(p, rv_frozen) for p in priors]):
-                raise ValueError('Priors must be a list of rv_frozen scipy.stats objects.')
+            if not all(hasattr(p, 'logpdf') and hasattr(p, 'ppf') for p in priors):
+                raise ValueError("Priors must provide 'logpdf' and 'ppf' methods (e.g., frozen scipy.stats distributions).")
 
         if self.priors is None:
             # Perform initial fit
@@ -164,7 +164,7 @@ class FittingBase:
         Calculate the negative log posterior of the model given the data.
 
         :param parameters: The parameters of the model.
-        :return: The negative log likelihood of the model.
+        :return: The negative log posterior of the model.
         """
         return -self.log_posterior(parameters)
 
@@ -180,7 +180,7 @@ class FittingBase:
             x[i] = self.priors[i].ppf(parameters[i])
         return x
 
-    def max_likelihood(self) -> tuple[float]:
+    def max_likelihood(self):
         """Find the max likelihood fit parameters for the model."""
         if self.priors is not None:
             x0 = [p.mean() for p in self.priors]
@@ -190,7 +190,7 @@ class FittingBase:
         for i, name in enumerate(self.parameter_names):
             self.data_group[name] = result[i] * self.parameter_units[i]
 
-    def max_aposteriori(self) -> tuple[float]:
+    def max_aposteriori(self):
         """Find the max aposteriori fit parameters for the model."""
         if self.priors is not None:
             x0 = [p.mean() for p in self.priors]

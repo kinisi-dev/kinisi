@@ -103,7 +103,7 @@ class Arrhenius(TemperatureDependent):
     def __init__(
         self,
         diffusion,
-        priors: tuple[tuple[VariableLike, VariableLike], tuple[VariableLike, VariableLike]] | None = None,
+        priors: list | None = None,
     ) -> 'Arrhenius':
         parameter_names = ('activation_energy', 'preexponential_factor')
         parameter_units = (sc.Unit('eV'), sc.Unit('cm^2/s'))
@@ -154,10 +154,7 @@ class VogelFulcherTammann(TemperatureDependent):
     def __init__(
         self,
         diffusion,
-        priors: tuple[
-            tuple[VariableLike, VariableLike], tuple[VariableLike, VariableLike], tuple[VariableLike, VariableLike]
-        ]
-        | None = None,
+        priors: list | None = None,
     ) -> 'VogelFulcherTammann':
         parameter_names = ('activation_energy', 'preexponential_factor', 'T0')
         parameter_units = (sc.Unit('eV'), sc.Unit('cm^2/s'), sc.Unit('K'))
