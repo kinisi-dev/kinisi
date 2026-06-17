@@ -62,9 +62,6 @@ class TestYehHummer:
         assert yh.D_infinite.value > np.max(D_values)
 
         # Check that viscosity is in reasonable range for water at 298K (should be around 1e-3 Pa*s)
-        print(yh.shear_viscosity)
-        print('a')        
-        print(yh.shear_viscosity.value)
         assert 1e-4 < yh.shear_viscosity.value < 1e-2
 
     def test_yeh_hummer_mcmc(self):
