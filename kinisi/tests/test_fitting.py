@@ -13,7 +13,7 @@ import unittest
 import numpy as np
 import scipp as sc
 from numpy.testing import assert_almost_equal, assert_equal
-from scipy.stats import uniform, norm
+from scipy.stats import norm, uniform
 from scipy.stats._distn_infrastructure import rv_frozen
 
 from kinisi import fitting
@@ -60,9 +60,7 @@ class TestFittingBase(unittest.TestCase):
         Test the initialisation of FittingBase class with priors
         """
         priors = [uniform(0, 1), uniform(0, 1e20)]
-        td = fitting.FittingBase(
-            data, straight_line, ('m', 'c'), (sc.Unit('m/s'), sc.Unit('m')), priors=priors
-        )
+        td = fitting.FittingBase(data, straight_line, ('m', 'c'), (sc.Unit('m/s'), sc.Unit('m')), priors=priors)
         assert_equal(td.function, straight_line)
         assert td.parameter_names == ('m', 'c')
         assert td.parameter_units == (sc.Unit('m/s'), sc.Unit('m'))
@@ -74,9 +72,7 @@ class TestFittingBase(unittest.TestCase):
         Test the initialisation of the FittingBase Class
         """
         priors = [norm(10, 1), norm(0, 1)]
-        td = fitting.FittingBase(
-            data, straight_line, ('m', 'c'), (sc.Unit('m/s'), sc.Unit('m')), priors=priors
-        ) 
+        td = fitting.FittingBase(data, straight_line, ('m', 'c'), (sc.Unit('m/s'), sc.Unit('m')), priors=priors)
         assert_equal(td.function, straight_line)
         assert td.parameter_names == ('m', 'c')
         assert td.parameter_units == (sc.Unit('m/s'), sc.Unit('m'))
@@ -89,9 +85,7 @@ class TestFittingBase(unittest.TestCase):
         """
         with self.assertRaises(ValueError):
             priors = [uniform(0, 1), uniform(0, 1e20), uniform(0, 1)]
-            fitting.FittingBase(
-                data, straight_line, ('m', 'c'), (sc.Unit('m/s'), sc.Unit('m')), priors=priors
-            )
+            fitting.FittingBase(data, straight_line, ('m', 'c'), (sc.Unit('m/s'), sc.Unit('m')), priors=priors)
 
     def test_repr(self):
         """
@@ -163,7 +157,9 @@ class TestFittingBase(unittest.TestCase):
         """
         Test the nested sampling function of FittingBase class where priors are norm
         """
-        td = fitting.FittingBase(data, straight_line, ('m', 'c'), (sc.Unit('m/s'), sc.Unit('m')), priors=[norm(1, 1), norm(0, 1)])
+        td = fitting.FittingBase(
+            data, straight_line, ('m', 'c'), (sc.Unit('m/s'), sc.Unit('m')), priors=[norm(1, 1), norm(0, 1)]
+        )
         td.nested_sampling()
         assert isinstance(td.data_group['m'], Samples)
         assert isinstance(td.data_group['c'], Samples)

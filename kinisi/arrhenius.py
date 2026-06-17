@@ -33,7 +33,7 @@ class TemperatureDependent(FittingBase):
     :param function: A callable function that describes the relationship between temperature and diffusion.
     :param parameter_names: A tuple of parameter names for the function.
     :param parameter_units: A tuple of sc.Unit objects corresponding to the parameter names.
-    :param priors: Optional prior probability distributions for the parameters of the function. 
+    :param priors: Optional prior probability distributions for the parameters of the function.
         Defaults to None, in which case a uniform distribution is defined with limits of
         +/- 50 percent of the best fit values.
     """
@@ -95,7 +95,7 @@ class Arrhenius(TemperatureDependent):
     Evaluate the data with a standard Arrhenius relationship.
 
     :param diffusion: Diffusion coefficient sc.DataFrame with a temperature coordinate and variances.
-    :param priors: Optional prior probability distributions for the parameters of the function. 
+    :param priors: Optional prior probability distributions for the parameters of the function.
         Defaults to None, in which case a uniform distribution is defined with limits of
         +/- 50 percent of the max likelihood values.
     """
@@ -146,7 +146,7 @@ class VogelFulcherTammann(TemperatureDependent):
     Evaluate the data with a Vogel-Fulcher-Tammann relationship.
 
     :param diffusion: Diffusion coefficient sc.DataFrame with a temperature coordinate and variances.
-    :param priors: Optional prior probability distributions for the parameters of the function. 
+    :param priors: Optional prior probability distributions for the parameters of the function.
         Defaults to None, in which case a uniform distribution is defined with limits of
         +/- 50 percent of the max likelihood values.
     """

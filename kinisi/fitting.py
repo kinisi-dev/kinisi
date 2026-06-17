@@ -32,7 +32,7 @@ class FittingBase:
     :param function: A callable function that describes the relationship
     :param parameter_names: A tuple of parameter names for the function
     :param parameter_units: A tuple of sc.Unit objects corresponding to the parameter names
-    :param priors: Prior probability distributions for the parameters of the function. 
+    :param priors: Prior probability distributions for the parameters of the function.
         Defaults to None, in which case a uniform distribution is defined with limits of
         +/- 50 percent of the max likelihood fit values.
     :param coordinate_name: Name of the coordinate to use as independent variable
@@ -61,9 +61,7 @@ class FittingBase:
                     f'Priors must be a list of length {len(self.parameter_names)}, got {len(priors)} instead.'
                 )
             if not all([isinstance(p, rv_frozen) for p in priors]):
-                raise ValueError(
-                    f'Priors must be a list of rv_frozen scipy.stats objects.'
-                )
+                raise ValueError('Priors must be a list of rv_frozen scipy.stats objects.')
 
         if self.priors is None:
             # Perform initial fit
@@ -160,11 +158,11 @@ class FittingBase:
         :return: The log posterior probability of the model parameters.
         """
         return self.log_likelihood(parameters) + self.log_prior(parameters)
-    
-    def nlp(self, parameters: tuple[float]) -> float: 
+
+    def nlp(self, parameters: tuple[float]) -> float:
         """
-        Calculate the negative log posterior of the model given the data. 
-        
+        Calculate the negative log posterior of the model given the data.
+
         :param parameters: The parameters of the model.
         :return: The negative log likelihood of the model.
         """
@@ -191,7 +189,7 @@ class FittingBase:
         result = minimize(self.nll, x0).x
         for i, name in enumerate(self.parameter_names):
             self.data_group[name] = result[i] * self.parameter_units[i]
-    
+
     def max_aposteriori(self) -> tuple[float]:
         """Find the max aposteriori fit parameters for the model."""
         if self.priors is not None:
