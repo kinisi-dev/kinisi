@@ -73,7 +73,7 @@ class YehHummer(FittingBase):
                 self.viscosity_to_slope(visc_upper) * self._slope_unit,
                 self.viscosity_to_slope(visc_lower) * self._slope_unit,
             )
-            slope_prior = uniform(slope_bounds[0], slope_bounds[1] - slope_bounds[0])
+            slope_prior = uniform(slope_bounds[0].value, (slope_bounds[1] - slope_bounds[0]).value)
             priors = [D_prior, slope_prior]
         else:
             if len(priors) != 2:
