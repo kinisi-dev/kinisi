@@ -15,7 +15,6 @@ from emcee import EnsembleSampler
 from scipy.linalg import pinvh
 from scipy.optimize import minimize
 from scipy.stats import uniform
-from scipy.stats._distn_infrastructure import rv_frozen
 
 from kinisi.samples import Samples
 
@@ -61,7 +60,9 @@ class FittingBase:
                     f'Priors must be a list of length {len(self.parameter_names)}, got {len(priors)} instead.'
                 )
             if not all(hasattr(p, 'logpdf') and hasattr(p, 'ppf') for p in priors):
-                raise ValueError("Priors must provide 'logpdf' and 'ppf' methods (e.g., frozen scipy.stats distributions).")
+                raise ValueError(
+                    "Priors must provide 'logpdf' and 'ppf' methods (e.g., frozen scipy.stats distributions)."
+                )
 
         if self.priors is None:
             # Perform initial fit

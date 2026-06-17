@@ -41,7 +41,7 @@ class YehHummer(FittingBase):
 
     :param diffusion: sc.DataArray with diffusion coefficients and box_length coordinate
     :param temperature: Temperature (will be extracted from coords if not provided)
-    :param priors: Optional priors for [D_0, viscosity] parameters using scipy.stats objects 
+    :param priors: Optional priors for [D_0, viscosity] parameters using scipy.stats objects
         (viscosity in Pa*s)
     """
 
