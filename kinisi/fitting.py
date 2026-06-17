@@ -181,7 +181,7 @@ class FittingBase:
             x[i] = self.priors[i].ppf(parameters[i])
         return x
 
-    def max_likelihood(self):
+    def max_likelihood(self) -> None:
         """Find the max likelihood fit parameters for the model."""
         if self.priors is not None:
             x0 = [p.mean() for p in self.priors]
@@ -191,7 +191,7 @@ class FittingBase:
         for i, name in enumerate(self.parameter_names):
             self.data_group[name] = result[i] * self.parameter_units[i]
 
-    def max_aposteriori(self):
+    def max_aposteriori(self) -> None:
         """Find the max aposteriori fit parameters for the model."""
         if self.priors is not None:
             x0 = [p.mean() for p in self.priors]

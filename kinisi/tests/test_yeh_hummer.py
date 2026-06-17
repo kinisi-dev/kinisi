@@ -106,7 +106,7 @@ class TestYehHummer:
         # Custom priors
         priors = (
             uniform(4e-5, 7e-5),  # D_0 prior
-            uniform(1e-4, 1e-2),  # viscosity prior
+            uniform(1e-4, 1e-2),  # slope prior
         )
 
         yh = YehHummer(td, temperature=sc.scalar(298, unit='K'), priors=priors)
