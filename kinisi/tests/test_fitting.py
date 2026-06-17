@@ -47,7 +47,6 @@ class TestFittingBase(unittest.TestCase):
         Test the initialisation of FittingBase class
         """
         td = fitting.FittingBase(data, straight_line, ('m', 'c'), (sc.Unit('m/s'), sc.Unit('m')))
-        u = uniform(loc=0, scale=1)
         assert_equal(td.function, straight_line)
         assert td.parameter_names == ('m', 'c')
         assert td.parameter_units == (sc.Unit('m/s'), sc.Unit('m'))
