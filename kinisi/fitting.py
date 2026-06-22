@@ -31,8 +31,9 @@ class FittingBase:
     :param function: A callable function that describes the relationship
     :param parameter_names: A tuple of parameter names for the function
     :param parameter_units: A tuple of sc.Unit objects corresponding to the parameter names
-    :param bounds: Optional bounds for the parameters of the function. Defaults to None,
-        in which case these are defined as +/- 50 percent of the best fit values
+    :param priors: Prior probability distributions for the parameters of the function.
+        Defaults to None, in which case a uniform distribution is defined with limits of
+        +/- 50 percent of the max likelihood fit values.
     :param coordinate_name: Name of the coordinate to use as independent variable
     """
 
@@ -42,28 +43,36 @@ class FittingBase:
         function: Callable,
         parameter_names: tuple[str, ...],
         parameter_units: tuple[sc.Unit, ...],
-        bounds: None | list = None,
+        priors: None | list = None,
         coordinate_name: str | None = None,
     ) -> 'FittingBase':
         self.data = data
         self.data_group = sc.DataGroup({'data': data})
         self.function = function
-        self.bounds = bounds
+        self.priors = priors
         self.parameter_names = parameter_names
         self.parameter_units = parameter_units
         self.coordinate_name = coordinate_name
 
-        if bounds is not None and len(bounds) != len(self.parameter_names):
-            raise ValueError(
-                f'Bounds must be a tuple of length {len(self.parameter_names)}, got {len(bounds)} instead.'
-            )
+        if priors is not None:
+            if len(priors) != len(self.parameter_names):
+                raise ValueError(
+                    f'Priors must be a list of length {len(self.parameter_names)}, got {len(priors)} instead.'
+                )
+            if not all(hasattr(p, 'logpdf') and hasattr(p, 'ppf') for p in priors):
+                raise ValueError(
+                    "Priors must provide 'logpdf' and 'ppf' methods (e.g., frozen scipy.stats distributions)."
+                )
 
-        # Perform initial fit
-        self.max_likelihood()
+        if self.priors is None:
+            # Perform initial fit
+            self.max_likelihood()
+        else:
+            self.max_aposteriori()
 
-        # Set default bounds if not provided
-        if self.bounds is None:
-            self.bounds = tuple(
+        # Set default priors if not provided
+        if self.priors is None:
+            bounds = tuple(
                 [
                     (
                         self.data_group[p].value * 0.5 * self.data_group[p].unit,
@@ -73,8 +82,8 @@ class FittingBase:
                 ]
             )
 
-        # Set up priors for nested sampling
-        self.priors = [uniform(b[0].value, b[1].value - b[0].value) for b in self.bounds]
+            # Set up priors for nested sampling
+            self.priors = [uniform(b[0].value, b[1].value - b[0].value) for b in bounds]
 
     def __repr__(self):
         """String representation."""
@@ -151,6 +160,15 @@ class FittingBase:
         """
         return self.log_likelihood(parameters) + self.log_prior(parameters)
 
+    def nlp(self, parameters: tuple[float]) -> float:
+        """
+        Calculate the negative log posterior of the model given the data.
+
+        :param parameters: The parameters of the model.
+        :return: The negative log posterior of the model.
+        """
+        return -self.log_posterior(parameters)
+
     def prior_transform(self, parameters: tuple[float]) -> tuple[float]:
         """
         Transform the parameters from the prior space to the parameter space.
@@ -163,14 +181,23 @@ class FittingBase:
             x[i] = self.priors[i].ppf(parameters[i])
         return x
 
-    def max_likelihood(self) -> tuple[float]:
-        """Find the best fit parameters for the model."""
-        if self.bounds is not None:
-            x0 = [((b[1] + b[0]) / 2) for b in self.bounds]
+    def max_likelihood(self) -> None:
+        """Find the max likelihood fit parameters for the model."""
+        if self.priors is not None:
+            x0 = [p.mean() for p in self.priors]
         else:
-            x0 = [1 * u for u in self.parameter_units]
-        bounds = [(b[0].value, b[1].value) for b in self.bounds] if self.bounds is not None else None
-        result = minimize(self.nll, [x.value for x in x0], bounds=bounds).x
+            x0 = [1 for u in self.parameter_units]
+        result = minimize(self.nll, x0).x
+        for i, name in enumerate(self.parameter_names):
+            self.data_group[name] = result[i] * self.parameter_units[i]
+
+    def max_aposteriori(self) -> None:
+        """Find the max aposteriori fit parameters for the model."""
+        if self.priors is not None:
+            x0 = [p.mean() for p in self.priors]
+        else:
+            x0 = [1 for u in self.parameter_units]
+        result = minimize(self.nlp, x0).x
         for i, name in enumerate(self.parameter_names):
             self.data_group[name] = result[i] * self.parameter_units[i]
 

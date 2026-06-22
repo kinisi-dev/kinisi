@@ -5,6 +5,7 @@ Tests for the YehHummer finite-size correction module.
 import numpy as np
 import pytest
 import scipp as sc
+from scipy.stats import uniform
 
 from kinisi.yeh_hummer import YehHummer
 
@@ -91,8 +92,8 @@ class TestYehHummer:
         assert dist.shape[0] == len(box_lengths)  # Number of data points
         assert dist.shape[1] > 0  # Number of samples
 
-    def test_yeh_hummer_bounds(self):
-        """Test YehHummer with custom bounds."""
+    def test_yeh_hummer_priors(self):
+        """Test YehHummer with custom priors."""
         box_lengths = np.array([20.0, 30.0, 40.0])
         D_values = np.array([5.0e-5, 5.2e-5, 5.4e-5])
         D_errors = np.array([0.1e-5, 0.1e-5, 0.1e-5])
@@ -102,17 +103,17 @@ class TestYehHummer:
             coords={'box_length': sc.Variable(dims=['system'], values=box_lengths, unit='angstrom')},
         )
 
-        # Custom bounds
-        bounds = (
-            (4e-5 * sc.Unit('cm^2/s'), 7e-5 * sc.Unit('cm^2/s')),  # D_0 bounds
-            (1e-4 * sc.Unit('Pa*s'), 1e-2 * sc.Unit('Pa*s')),  # viscosity bounds
+        # Custom priors
+        priors = (
+            uniform(4e-5, 7e-5),  # D_0 prior
+            uniform(1e-4, 1e-2),  # slope prior
         )
 
-        yh = YehHummer(td, temperature=sc.scalar(298, unit='K'), bounds=bounds)
+        yh = YehHummer(td, temperature=sc.scalar(298, unit='K'), priors=priors)
 
-        # Check that fitted values are within bounds
-        assert bounds[0][0].value <= yh.D_infinite.value <= bounds[0][1].value
-        assert bounds[1][0].value <= yh.shear_viscosity.value <= bounds[1][1].value
+        # Check that fitted values are within priors
+        assert priors[0].a <= yh.D_infinite.value <= (priors[0].b + priors[0].a)
+        assert priors[1].a <= yh.shear_viscosity.value <= (priors[1].b + priors[1].a)
 
     def test_yeh_hummer_properties(self):
         """Test YehHummer property accessors."""
@@ -137,8 +138,8 @@ class TestYehHummer:
         assert len(str(yh)) > 0
         assert len(repr(yh)) > 0
 
-    def test_yeh_hummer_invalid_bounds(self):
-        """Test YehHummer with invalid bounds."""
+    def test_yeh_hummer_invalid_priors(self):
+        """Test YehHummer with invalid priors."""
         box_lengths = np.array([20.0, 30.0, 40.0])
         D_values = np.array([5.0e-5, 5.2e-5, 5.4e-5])
         D_errors = np.array([0.1e-5, 0.1e-5, 0.1e-5])
@@ -149,7 +150,7 @@ class TestYehHummer:
         )
 
         # Wrong number of bounds
-        bounds = ((4e-5 * sc.Unit('cm^2/s'), 7e-5 * sc.Unit('cm^2/s')),)  # Only one bound
+        priors = [uniform(4e-5, 7e-5)]  # Only one bound
 
-        with pytest.raises(ValueError, match='Bounds must be a tuple of length 2'):
-            YehHummer(td, temperature=sc.scalar(298, unit='K'), bounds=bounds)
+        with pytest.raises(ValueError, match='Priors must be a list of length 2.'):
+            YehHummer(td, temperature=sc.scalar(298, unit='K'), priors=priors)

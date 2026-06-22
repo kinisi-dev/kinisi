@@ -13,6 +13,7 @@ import numpy as np
 import scipp as sc
 import scipp.constants as const
 from scipy.optimize import curve_fit, minimize
+from scipy.stats import uniform
 
 from kinisi import __version__
 from kinisi.fitting import FittingBase
@@ -40,10 +41,11 @@ class YehHummer(FittingBase):
 
     :param diffusion: sc.DataArray with diffusion coefficients and box_length coordinate
     :param temperature: Temperature (will be extracted from coords if not provided)
-    :param bounds: Optional bounds for [D_0, viscosity] parameters (viscosity in Pa*s)
+    :param priors: Optional priors for [D_0, viscosity] parameters using scipy.stats objects,
+        where viscosity has units Pa*s.
     """
 
-    def __init__(self, diffusion, temperature: sc.Variable, bounds=None):
+    def __init__(self, diffusion, temperature: sc.Variable, priors=None):
         self.diffusion = diffusion
 
         # Extract box lengths from coordinates
@@ -60,22 +62,22 @@ class YehHummer(FittingBase):
         parameter_names = ('D_0', 'slope')
         parameter_units = (diffusion.unit, self._slope_unit)
 
-        # Compute bounds: use provided or defaults
-        if bounds is None:
+        # Compute priors: use provided or defaults
+        if priors is None:
             D_max = np.max(diffusion.values)
-            D_bounds = (D_max * 0.8 * diffusion.unit, D_max * 2.0 * diffusion.unit)
+            D_prior = uniform(D_max * 0.8, D_max * 1.2)
             visc_lower, visc_upper = 1e-5 * sc.Unit('Pa*s'), 1e-1 * sc.Unit('Pa*s')
-        else:
-            if len(bounds) != 2:
-                raise ValueError('Bounds must be a tuple of length 2: (D_0_bounds, viscosity_bounds)')
-            D_bounds = (bounds[0][0].to(unit=parameter_units[0]), bounds[0][1].to(unit=parameter_units[0]))
-            visc_lower, visc_upper = bounds[1]
 
-        # Higher viscosity = lower slope, so bounds are inverted
-        slope_bounds = (
-            self.viscosity_to_slope(visc_upper) * self._slope_unit,
-            self.viscosity_to_slope(visc_lower) * self._slope_unit,
-        )
+            # Higher viscosity = lower slope, so bounds are inverted
+            slope_bounds = (
+                self.viscosity_to_slope(visc_upper) * self._slope_unit,
+                self.viscosity_to_slope(visc_lower) * self._slope_unit,
+            )
+            slope_prior = uniform(slope_bounds[0].value, (slope_bounds[1] - slope_bounds[0]).value)
+            priors = [D_prior, slope_prior]
+        else:
+            if len(priors) != 2:
+                raise ValueError('Priors must be a list of length 2.')
 
         # Initialize base class with linear function
         super().__init__(
@@ -83,7 +85,7 @@ class YehHummer(FittingBase):
             function=self._yeh_hummer_function,
             parameter_names=parameter_names,
             parameter_units=parameter_units,
-            bounds=[D_bounds, slope_bounds],
+            priors=priors,
             coordinate_name='box_length',
         )
 
@@ -159,9 +161,35 @@ class YehHummer(FittingBase):
         # Use these as initial parameters for optimization
         x0 = [D_0_init, slope_init]
 
-        # Convert bounds to format expected by scipy
-        bounds_scipy = [(b[0].value, b[1].value) for b in self.bounds]
-        result = minimize(self.nll, x0, bounds=bounds_scipy, method='L-BFGS-B')
+        result = minimize(self.nll, x0, method='L-BFGS-B')
+
+        # Store results
+        self.data_group['D_0'] = result.x[0] * self.parameter_units[0]
+        self.data_group['slope'] = result.x[1] * self.parameter_units[1]
+
+    def max_aposteriori(self):
+        """Find maximum aposteriori parameters with better initial guess for YehHummer."""
+        # Use linear fit for initial parameters
+        inv_L, D_values, D_errors = self._prepare_data_for_fit()
+
+        def linear_func(x, a, b):
+            return a - b * x
+
+        popt, _ = curve_fit(
+            linear_func,
+            inv_L,
+            D_values,
+            sigma=D_errors if np.any(D_errors > 0) else None,
+            p0=[np.max(D_values), (D_values[0] - D_values[-1]) / (inv_L[0] - inv_L[-1])],
+        )
+
+        D_0_init = popt[0]
+        slope_init = popt[1]
+
+        # Use these as initial parameters for optimization
+        x0 = [D_0_init, slope_init]
+
+        result = minimize(self.nlp, x0, method='L-BFGS-B')
 
         # Store results
         self.data_group['D_0'] = result.x[0] * self.parameter_units[0]

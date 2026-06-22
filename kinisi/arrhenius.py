@@ -33,8 +33,9 @@ class TemperatureDependent(FittingBase):
     :param function: A callable function that describes the relationship between temperature and diffusion.
     :param parameter_names: A tuple of parameter names for the function.
     :param parameter_units: A tuple of sc.Unit objects corresponding to the parameter names.
-    :param bounds: Optional bounds for the parameters of the function. Defaults to None, in which case these
-        are defined as +/- 50 percent of the best fit values.
+    :param priors: Optional prior probability distributions for the parameters of the function.
+        Defaults to None, in which case a uniform distribution is defined with limits of
+        +/- 50 percent of the best fit values.
     """
 
     def __init__(
@@ -43,7 +44,7 @@ class TemperatureDependent(FittingBase):
         function: Callable,
         parameter_names: tuple[str],
         parameter_units: tuple[sc.Unit],
-        bounds: None | list = None,
+        priors: None | list = None,
     ) -> 'TemperatureDependent':
         self.diffusion = diffusion
         self.temperature = diffusion.coords['temperature']
@@ -53,7 +54,7 @@ class TemperatureDependent(FittingBase):
             function=function,
             parameter_names=parameter_names,
             parameter_units=parameter_units,
-            bounds=bounds,
+            priors=priors,
             coordinate_name='temperature',
         )
 
@@ -94,19 +95,20 @@ class Arrhenius(TemperatureDependent):
     Evaluate the data with a standard Arrhenius relationship.
 
     :param diffusion: Diffusion coefficient sc.DataFrame with a temperature coordinate and variances.
-    :param bounds: Optional bounds for the parameters of the function. Defaults to None, in which case these
-        are defined as +/- 50 percent of the best fit values.
+    :param priors: Optional prior probability distributions for the parameters of the function.
+        Defaults to None, in which case a uniform distribution is defined with limits of
+        +/- 50 percent of the max likelihood values.
     """
 
     def __init__(
         self,
         diffusion,
-        bounds: tuple[tuple[VariableLike, VariableLike], tuple[VariableLike, VariableLike]] | None = None,
+        priors: list | None = None,
     ) -> 'Arrhenius':
         parameter_names = ('activation_energy', 'preexponential_factor')
         parameter_units = (sc.Unit('eV'), sc.Unit('cm^2/s'))
 
-        super().__init__(diffusion, arrhenius, parameter_names, parameter_units, bounds=bounds)
+        super().__init__(diffusion, arrhenius, parameter_names, parameter_units, priors=priors)
 
     @property
     def activation_energy(self) -> VariableLike | Samples:
@@ -144,22 +146,20 @@ class VogelFulcherTammann(TemperatureDependent):
     Evaluate the data with a Vogel-Fulcher-Tammann relationship.
 
     :param diffusion: Diffusion coefficient sc.DataFrame with a temperature coordinate and variances.
-    :param bounds: Optional bounds for the parameters of the function. Defaults to None, in which case these
-        are defined as +/- 50 percent of the best fit values.
+    :param priors: Optional prior probability distributions for the parameters of the function.
+        Defaults to None, in which case a uniform distribution is defined with limits of
+        +/- 50 percent of the max likelihood values.
     """
 
     def __init__(
         self,
         diffusion,
-        bounds: tuple[
-            tuple[VariableLike, VariableLike], tuple[VariableLike, VariableLike], tuple[VariableLike, VariableLike]
-        ]
-        | None = None,
+        priors: list | None = None,
     ) -> 'VogelFulcherTammann':
         parameter_names = ('activation_energy', 'preexponential_factor', 'T0')
         parameter_units = (sc.Unit('eV'), sc.Unit('cm^2/s'), sc.Unit('K'))
 
-        super().__init__(diffusion, vtf_equation, parameter_names, parameter_units, bounds=bounds)
+        super().__init__(diffusion, vtf_equation, parameter_names, parameter_units, priors=priors)
 
     @property
     def activation_energy(self) -> VariableLike | Samples:
