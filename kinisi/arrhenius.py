@@ -181,3 +181,153 @@ class VogelFulcherTammann(TemperatureDependent):
         :return: Temperature factor for the VTF equation in kelvin.
         """
         return self.data_group['T0']
+
+def piecewise_smooth_equation(
+        abscissa: VariableLike, activation_energy_low: VariableLike, activation_energy_high: VariableLike, preexponential_factor: VariableLike, T0: VariableLike, width: VariableLike
+        ) -> VariableLike:
+    """
+    Evaluate the data with two Arrhenius regions following a piecewise equation smoothed with a sigmoid function.
+
+    :param abscissa: The temperature data.
+    :param activation_energy_high: The high-temperature activation energy value.
+    :param activation_energy_low: The low-temperature activation energy value.
+    :param prefactor: The prefactor value.
+    :param T0: Phase transition temperature.
+    :param width: width of the sigmoid transition.
+
+    :return: The diffusion coefficient data.
+    """
+    h = 1.0 / (1.0 + np.exp((abscissa - T0)/width))
+    activation_energy_delta = (
+        activation_energy_low - activation_energy_high
+    )
+    return preexponential_factor * np.exp(
+        -(activation_energy_high + h * activation_energy_delta)
+        / (R_eV.values) * (1/abscissa - 1/T0)
+        )
+
+class PiecewiseSmoothArrhenius(TemperatureDependent):
+    """
+    Evaluate the data with two Arrhenius regions following a piecewise relationship smoothed with a sigmoid function.
+
+    :param diffusion: Diffusion coefficient sc.DataFrame with a temperature coordinate and variances.
+    :param bounds: Optional bounds for the parameters of the function. Defaults to None, in which case these are defined as +/- 50 percent of the best fit values.
+    """
+    def __init__(
+        self,
+        diffusion,
+        bounds: tuple[
+            tuple[VariableLike, VariableLike], tuple[VariableLike, VariableLike], tuple[VariableLike, VariableLike], tuple[VariableLike, VariableLike], tuple[VariableLike, VariableLike]
+        ]
+        | None = None,
+    ) -> 'PiecewiseSmoothArrhenius':
+        parameter_names = ('activation_energy_low', 'activation_energy_high', 'preexponential_factor', 'T0', 'width')
+        parameter_units = (sc.Unit('eV'), sc.Unit('eV'), sc.Unit('cm^2/s'), sc.Unit('K'), sc.Unit('K'))
+
+        super().__init__(diffusion, piecewise_smooth_equation, parameter_names, parameter_units, bounds=bounds)
+
+    @property
+    def activation_energy_low(self) -> VariableLike | Samples:
+        """
+        :return: Low-temperature activated energy distribution in electronvolt.
+        """
+        return self.data_group['activation_energy_low']
+
+    @property
+    def activation_energy_high(self) -> VariableLike | Samples:
+        """
+        :return: High-temperature activated energy distribution in electronvolt.
+        """
+        return self.data_group['activation_energy_high']
+
+    @property
+    def preexponential_factor(self) -> VariableLike | Samples:
+        """
+        :return: Preexponential factor.
+        """
+        return self.data_group['preexponential_factor']
+
+    @property
+    def T0(self) -> VariableLike | Samples:
+        """
+        :return: Temperature factor for the VTF equation in kelvin.
+        """
+        return self.data_group['T0']
+
+    @property
+    def width(self) -> VariableLike | Samples:
+        """
+        :return: Width of the sigmoid function
+        """
+        return self.data_group['width']
+
+def piecewise_equation(
+        abscissa: VariableLike, activation_energy_low: VariableLike, activation_energy_high: VariableLike, preexponential_factor: VariableLike, T0: VariableLike
+        ) -> VariableLike:
+    """
+    Evaluate the data with two Arrhenius regions following a piecewise equation.
+
+    :param abscissa: The temperature data.
+    :param activation_energy_high: The high-temperature activation energy value.
+    :param activation_energy_low: The low-temperature activation energy value.
+    :param prefactor: The prefactor value.
+    :param T0: Phase transition temperature.
+
+    :return: The diffusion coefficient data.
+    """
+    h = np.where(abscissa < T0, 1.0, 0.0)
+    activation_energy_delta = (
+        activation_energy_low - activation_energy_high
+    )
+    return preexponential_factor * np.exp(
+        -(activation_energy_high + h * activation_energy_delta)
+        / (R_eV.values) * (1/abscissa - 1/T0)
+        )
+
+class PiecewiseArrhenius(TemperatureDependent):
+    """
+    Evaluate the data with two Arrhenius regions following a piecewise relationship.
+
+    :param diffusion: Diffusion coefficient sc.DataFrame with a temperature coordinate and variances.
+    :param bounds: Optional bounds for the parameters of the function. Defaults to None, in which case these are defined as +/- 50 percent of the best fit values.
+    """
+    def __init__(
+        self,
+        diffusion,
+        bounds: tuple[
+            tuple[VariableLike, VariableLike], tuple[VariableLike, VariableLike], tuple[VariableLike, VariableLike], tuple[VariableLike, VariableLike]
+        ]
+        | None = None,
+    ) -> 'PiecewiseArrhenius':
+        parameter_names = ('activation_energy_low', 'activation_energy_high', 'preexponential_factor', 'T0')
+        parameter_units = (sc.Unit('eV'), sc.Unit('eV'), sc.Unit('cm^2/s'), sc.Unit('K'))
+
+        super().__init__(diffusion, piecewise_equation, parameter_names, parameter_units, bounds=bounds)
+
+    @property
+    def activation_energy_low(self) -> VariableLike | Samples:
+        """
+        :return: Low-temperature activated energy distribution in electronvolt.
+        """
+        return self.data_group['activation_energy_low']
+
+    @property
+    def activation_energy_high(self) -> VariableLike | Samples:
+        """
+        :return: High-temperature activated energy distribution in electronvolt.
+        """
+        return self.data_group['activation_energy_high']
+
+    @property
+    def preexponential_factor(self) -> VariableLike | Samples:
+        """
+        :return: Preexponential factor.
+        """
+        return self.data_group['preexponential_factor']
+
+    @property
+    def T0(self) -> VariableLike | Samples:
+        """
+        :return: Temperature factor for the VTF equation in kelvin.
+        """
+        return self.data_group['T0']
