@@ -216,15 +216,12 @@ class PiecewiseSmoothArrhenius(TemperatureDependent):
     def __init__(
         self,
         diffusion,
-        bounds: tuple[
-            tuple[VariableLike, VariableLike], tuple[VariableLike, VariableLike], tuple[VariableLike, VariableLike], tuple[VariableLike, VariableLike], tuple[VariableLike, VariableLike]
-        ]
-        | None = None,
+        priors: list | None = None,
     ) -> 'PiecewiseSmoothArrhenius':
         parameter_names = ('activation_energy_low', 'activation_energy_high', 'preexponential_factor', 'T0', 'width')
         parameter_units = (sc.Unit('eV'), sc.Unit('eV'), sc.Unit('cm^2/s'), sc.Unit('K'), sc.Unit('K'))
 
-        super().__init__(diffusion, piecewise_smooth_equation, parameter_names, parameter_units, bounds=bounds)
+        super().__init__(diffusion, piecewise_smooth_equation, parameter_names, parameter_units, priors=priors)
 
     @property
     def activation_energy_low(self) -> VariableLike | Samples:
@@ -294,15 +291,12 @@ class PiecewiseArrhenius(TemperatureDependent):
     def __init__(
         self,
         diffusion,
-        bounds: tuple[
-            tuple[VariableLike, VariableLike], tuple[VariableLike, VariableLike], tuple[VariableLike, VariableLike], tuple[VariableLike, VariableLike]
-        ]
-        | None = None,
+        priors: list | None = None,
     ) -> 'PiecewiseArrhenius':
         parameter_names = ('activation_energy_low', 'activation_energy_high', 'preexponential_factor', 'T0')
         parameter_units = (sc.Unit('eV'), sc.Unit('eV'), sc.Unit('cm^2/s'), sc.Unit('K'))
 
-        super().__init__(diffusion, piecewise_equation, parameter_names, parameter_units, bounds=bounds)
+        super().__init__(diffusion, piecewise_equation, parameter_names, parameter_units, priors=priors)
 
     @property
     def activation_energy_low(self) -> VariableLike | Samples:
