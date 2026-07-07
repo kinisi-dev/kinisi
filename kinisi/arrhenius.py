@@ -182,9 +182,15 @@ class VogelFulcherTammann(TemperatureDependent):
         """
         return self.data_group['T0']
 
+
 def piecewise_smooth_equation(
-        abscissa: VariableLike, activation_energy_low: VariableLike, activation_energy_high: VariableLike, preexponential_factor: VariableLike, T0: VariableLike, width: VariableLike
-        ) -> VariableLike:
+    abscissa: VariableLike,
+    activation_energy_low: VariableLike,
+    activation_energy_high: VariableLike,
+    preexponential_factor: VariableLike,
+    T0: VariableLike,
+    width: VariableLike,
+) -> VariableLike:
     """
     Evaluate the data with two Arrhenius regions following a piecewise equation smoothed with a sigmoid function.
 
@@ -197,14 +203,12 @@ def piecewise_smooth_equation(
 
     :return: The diffusion coefficient data.
     """
-    h = 1.0 / (1.0 + np.exp((abscissa - T0)/width))
-    activation_energy_delta = (
-        activation_energy_low - activation_energy_high
-    )
+    h = 1.0 / (1.0 + np.exp((abscissa - T0) / width))
+    activation_energy_delta = activation_energy_low - activation_energy_high
     return preexponential_factor * np.exp(
-        -(activation_energy_high + h * activation_energy_delta)
-        / (R_eV.values) * (1/abscissa - 1/T0)
-        )
+        -(activation_energy_high + h * activation_energy_delta) / (R_eV.values) * (1 / abscissa - 1 / T0)
+    )
+
 
 class PiecewiseSmoothArrhenius(TemperatureDependent):
     """
@@ -215,6 +219,7 @@ class PiecewiseSmoothArrhenius(TemperatureDependent):
         Defaults to None, in which case a uniform distribution is defined with limits of
         +/- 50 percent of the best fit values.
     """
+
     def __init__(
         self,
         diffusion,
@@ -260,9 +265,14 @@ class PiecewiseSmoothArrhenius(TemperatureDependent):
         """
         return self.data_group['width']
 
+
 def piecewise_equation(
-        abscissa: VariableLike, activation_energy_low: VariableLike, activation_energy_high: VariableLike, preexponential_factor: VariableLike, T0: VariableLike
-        ) -> VariableLike:
+    abscissa: VariableLike,
+    activation_energy_low: VariableLike,
+    activation_energy_high: VariableLike,
+    preexponential_factor: VariableLike,
+    T0: VariableLike,
+) -> VariableLike:
     """
     Evaluate the data with two Arrhenius regions following a piecewise equation.
 
@@ -275,13 +285,11 @@ def piecewise_equation(
     :return: The diffusion coefficient data.
     """
     h = np.where(abscissa < T0, 1.0, 0.0)
-    activation_energy_delta = (
-        activation_energy_low - activation_energy_high
-    )
+    activation_energy_delta = activation_energy_low - activation_energy_high
     return preexponential_factor * np.exp(
-        -(activation_energy_high + h * activation_energy_delta)
-        / (R_eV.values) * (1/abscissa - 1/T0)
-        )
+        -(activation_energy_high + h * activation_energy_delta) / (R_eV.values) * (1 / abscissa - 1 / T0)
+    )
+
 
 class PiecewiseArrhenius(TemperatureDependent):
     """
@@ -292,6 +300,7 @@ class PiecewiseArrhenius(TemperatureDependent):
         Defaults to None, in which case a uniform distribution is defined with limits of
         +/- 50 percent of the best fit values.
     """
+
     def __init__(
         self,
         diffusion,
