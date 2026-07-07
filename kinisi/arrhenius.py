@@ -211,7 +211,9 @@ class PiecewiseSmoothArrhenius(TemperatureDependent):
     Evaluate the data with two Arrhenius regions following a piecewise relationship smoothed with a sigmoid function.
 
     :param diffusion: Diffusion coefficient sc.DataFrame with a temperature coordinate and variances.
-    :param bounds: Optional bounds for the parameters of the function. Defaults to None, in which case these are defined as +/- 50 percent of the best fit values.
+    :param priors: Optional prior probability distributions for the parameters of the function.
+        Defaults to None, in which case a uniform distribution is defined with limits of
+        +/- 50 percent of the best fit values.
     """
     def __init__(
         self,
@@ -247,7 +249,7 @@ class PiecewiseSmoothArrhenius(TemperatureDependent):
     @property
     def T0(self) -> VariableLike | Samples:
         """
-        :return: Temperature factor for the VTF equation in kelvin.
+        :return: Transition temperature in between the low temperature and high temperature phases in kelvin.
         """
         return self.data_group['T0']
 
@@ -286,7 +288,9 @@ class PiecewiseArrhenius(TemperatureDependent):
     Evaluate the data with two Arrhenius regions following a piecewise relationship.
 
     :param diffusion: Diffusion coefficient sc.DataFrame with a temperature coordinate and variances.
-    :param bounds: Optional bounds for the parameters of the function. Defaults to None, in which case these are defined as +/- 50 percent of the best fit values.
+    :param priors: Optional prior probability distributions for the parameters of the function.
+        Defaults to None, in which case a uniform distribution is defined with limits of
+        +/- 50 percent of the best fit values.
     """
     def __init__(
         self,
@@ -322,6 +326,6 @@ class PiecewiseArrhenius(TemperatureDependent):
     @property
     def T0(self) -> VariableLike | Samples:
         """
-        :return: Temperature factor for the VTF equation in kelvin.
+        :return: Transition temperature in between the low temperature and high temperature phases in kelvin.
         """
         return self.data_group['T0']
