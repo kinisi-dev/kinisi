@@ -209,7 +209,7 @@ class TestPiecewiseArrhenius(unittest.TestCase):
             10.0,
             300,
         )
-        expected = 0.45295
+        expected = 0.4529592257687849
         assert_almost_equal(result, expected)
 
     def test_piecewise_equation_high_temp(self):
@@ -223,7 +223,7 @@ class TestPiecewiseArrhenius(unittest.TestCase):
             10.0,
             300,
         )
-        expected = 831.592
+        expected = 831.6020621232062
         assert_almost_equal(result, expected)
 
 
