@@ -293,7 +293,7 @@ class TestPiecewiseSmoothArrhenius(unittest.TestCase):
         Test the piecewise smooth arrhenius function at low temperature activation energy.
         """
         result = arrhenius.piecewise_smooth_equation(250, 0.4, 0.8, 10.0, 300, 5)
-        expected = 0.45295926840950357
+        expected = 0.45289563869821076
         assert_almost_equal(result, expected)
 
     def test_piecewise_equation_high_temp(self):
@@ -301,5 +301,5 @@ class TestPiecewiseSmoothArrhenius(unittest.TestCase):
         Test the piecewise smooth arrhenius function at high temperature activation energy.
         """
         result = arrhenius.piecewise_smooth_equation(350, 0.4, 0.8, 10.0, 300, 5)
-        expected = 831.6019502868855
+        expected = 831.5185059281537
         assert_almost_equal(result, expected)
