@@ -226,14 +226,14 @@ class PiecewiseSmoothArrhenius(TemperatureDependent):
         super().__init__(diffusion, piecewise_smooth_equation, parameter_names, parameter_units, priors=priors)
 
     @property
-    def activation_energy_low(self) -> VariableLike | Samples:
+    def activation_energy_low_temperature(self) -> VariableLike | Samples:
         """
         :return: Low-temperature activated energy distribution in electronvolt.
         """
         return self.data_group['activation_energy_low']
 
     @property
-    def activation_energy_high(self) -> VariableLike | Samples:
+    def activation_energy_high_temperature(self) -> VariableLike | Samples:
         """
         :return: High-temperature activated energy distribution in electronvolt.
         """
@@ -303,14 +303,14 @@ class PiecewiseArrhenius(TemperatureDependent):
         super().__init__(diffusion, piecewise_equation, parameter_names, parameter_units, priors=priors)
 
     @property
-    def activation_energy_low(self) -> VariableLike | Samples:
+    def activation_energy_low_temperature(self) -> VariableLike | Samples:
         """
         :return: Low-temperature activated energy distribution in electronvolt.
         """
         return self.data_group['activation_energy_low']
 
     @property
-    def activation_energy_high(self) -> VariableLike | Samples:
+    def activation_energy_high_temperature(self) -> VariableLike | Samples:
         """
         :return: High-temperature activated energy distribution in electronvolt.
         """
