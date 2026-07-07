@@ -225,7 +225,13 @@ class PiecewiseSmoothArrhenius(TemperatureDependent):
         diffusion,
         priors: list | None = None,
     ) -> 'PiecewiseSmoothArrhenius':
-        parameter_names = ('activation_energy_low', 'activation_energy_high', 'preexponential_factor', 'T0', 'width')
+        parameter_names = (
+            'activation_energy_low_temperature',
+            'activation_energy_high_temperature',
+            'preexponential_factor',
+            'T0',
+            'width',
+        )
         parameter_units = (sc.Unit('eV'), sc.Unit('eV'), sc.Unit('cm^2/s'), sc.Unit('K'), sc.Unit('K'))
 
         super().__init__(diffusion, piecewise_smooth_equation, parameter_names, parameter_units, priors=priors)
@@ -235,14 +241,14 @@ class PiecewiseSmoothArrhenius(TemperatureDependent):
         """
         :return: Low-temperature activated energy distribution in electronvolt.
         """
-        return self.data_group['activation_energy_low']
+        return self.data_group['activation_energy_low_temperature']
 
     @property
     def activation_energy_high_temperature(self) -> VariableLike | Samples:
         """
         :return: High-temperature activated energy distribution in electronvolt.
         """
-        return self.data_group['activation_energy_high']
+        return self.data_group['activation_energy_high_temperature']
 
     @property
     def preexponential_factor(self) -> VariableLike | Samples:
@@ -306,7 +312,12 @@ class PiecewiseArrhenius(TemperatureDependent):
         diffusion,
         priors: list | None = None,
     ) -> 'PiecewiseArrhenius':
-        parameter_names = ('activation_energy_low', 'activation_energy_high', 'preexponential_factor', 'T0')
+        parameter_names = (
+            'activation_energy_low_temperature',
+            'activation_energy_high_temperature',
+            'preexponential_factor',
+            'T0',
+        )
         parameter_units = (sc.Unit('eV'), sc.Unit('eV'), sc.Unit('cm^2/s'), sc.Unit('K'))
 
         super().__init__(diffusion, piecewise_equation, parameter_names, parameter_units, priors=priors)
@@ -316,14 +327,14 @@ class PiecewiseArrhenius(TemperatureDependent):
         """
         :return: Low-temperature activated energy distribution in electronvolt.
         """
-        return self.data_group['activation_energy_low']
+        return self.data_group['activation_energy_low_temperature']
 
     @property
     def activation_energy_high_temperature(self) -> VariableLike | Samples:
         """
         :return: High-temperature activated energy distribution in electronvolt.
         """
-        return self.data_group['activation_energy_high']
+        return self.data_group['activation_energy_high_temperature']
 
     @property
     def preexponential_factor(self) -> VariableLike | Samples:

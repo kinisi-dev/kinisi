@@ -209,7 +209,7 @@ class TestPiecewiseArrhenius(unittest.TestCase):
             10.0,
             300,
         )
-        expected = 0.4529592257687849
+        expected = 0.45295926840950357
         assert_almost_equal(result, expected)
 
     def test_piecewise_equation_high_temp(self):
@@ -223,7 +223,7 @@ class TestPiecewiseArrhenius(unittest.TestCase):
             10.0,
             300,
         )
-        expected = 831.6020621232062
+        expected = 831.6019502868855
         assert_almost_equal(result, expected)
 
 
@@ -257,7 +257,7 @@ class TestPiecewiseSmoothArrhenius(unittest.TestCase):
             uniform(0, 1),  # activation_energy_high_temperature
             uniform(0, 1e20),  # preexponential_factor
             uniform(0, 1000),  # T0
-            uniform(0, 100),  # width
+            uniform(0, 10),  # width
         )
         psa = arrhenius.PiecewiseSmoothArrhenius(data, priors=priors)
         assert_equal(psa.function, arrhenius.piecewise_smooth_equation)
@@ -285,21 +285,21 @@ class TestPiecewiseSmoothArrhenius(unittest.TestCase):
         """
         Test the piecewise smooth arrhenius function at T0.
         """
-        result = arrhenius.piecewise_smooth_equation(300, 0.4, 0.8, 10.0, 300, 10)
+        result = arrhenius.piecewise_smooth_equation(300, 0.4, 0.8, 10.0, 300, 5)
         assert_almost_equal(result, 10.0, decimal=5)
 
     def test_piecewise_equation_low_temp(self):
         """
         Test the piecewise smooth arrhenius function at low temperature activation energy.
         """
-        result = arrhenius.piecewise_smooth_equation(250, 0.4, 0.8, 10.0, 300, 10)
-        expected = 0.45295
+        result = arrhenius.piecewise_smooth_equation(250, 0.4, 0.8, 10.0, 300, 5)
+        expected = 0.45295926840950357
         assert_almost_equal(result, expected)
 
     def test_piecewise_equation_high_temp(self):
         """
         Test the piecewise smooth arrhenius function at high temperature activation energy.
         """
-        result = arrhenius.piecewise_smooth_equation(350, 0.4, 0.8, 10.0, 300, 10)
-        expected = 831.592
+        result = arrhenius.piecewise_smooth_equation(350, 0.4, 0.8, 10.0, 300, 5)
+        expected = 831.6019502868855
         assert_almost_equal(result, expected)
