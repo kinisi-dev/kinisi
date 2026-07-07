@@ -144,8 +144,8 @@ class TestPiecewiseArrhenius(unittest.TestCase):
         pa = arrhenius.PiecewiseArrhenius(data)
         assert_equal(pa.function, arrhenius.piecewise_equation)
         assert pa.parameter_names == (
-            'activation_energy_low',
-            'activation_energy_high',
+            'activation_energy_low_temperature',
+            'activation_energy_high_temperature',
             'preexponential_factor',
             'T0',
         )
@@ -155,8 +155,8 @@ class TestPiecewiseArrhenius(unittest.TestCase):
             sc.Unit('cm^2/s'),
             sc.Unit('K'),
         )
-        assert isinstance(pa.activation_energy_low, sc.Variable)
-        assert isinstance(pa.activation_energy_high, sc.Variable)
+        assert isinstance(pa.activation_energy_low_temperature, sc.Variable)
+        assert isinstance(pa.activation_energy_high_temperature, sc.Variable)
         assert isinstance(pa.preexponential_factor, sc.Variable)
         assert isinstance(pa.T0, sc.Variable)
     def test_init_priors(self):
@@ -164,16 +164,16 @@ class TestPiecewiseArrhenius(unittest.TestCase):
         Test the initialisation of PiecewiseArrhenius class with priors
         """
         priors = (
-            uniform(0, 1),      # activation_energy_low
-            uniform(0, 1),      # activation_energy_high
+            uniform(0, 1),      # activation_energy_low_temperature
+            uniform(0, 1),      # activation_energy_high_temperature
             uniform(0, 1e20),   # preexponential_factor
             uniform(0, 1000),   # T0
         )
         pa = arrhenius.PiecewiseArrhenius(data, priors=priors)
         assert_equal(pa.function, arrhenius.piecewise_equation)
         assert pa.parameter_names == (
-            'activation_energy_low',
-            'activation_energy_high',
+            'activation_energy_low_temperature',
+            'activation_energy_high_temperature',
             'preexponential_factor',
             'T0',
         )
@@ -216,14 +216,14 @@ class TestPiecewiseSmoothArrhenius(unittest.TestCase):
         psa = arrhenius.PiecewiseSmoothArrhenius(data)
         assert_equal(psa.function,arrhenius.piecewise_smooth_equation)
         assert psa.parameter_names == (
-            'activation_energy_low',
-            'activation_energy_high',
+            'activation_energy_low_temperature',
+            'activation_energy_high_temperature',
             'preexponential_factor',
             'T0',
             'width',
         )
-        assert isinstance(psa.activation_energy_low, sc.Variable)
-        assert isinstance(psa.activation_energy_high, sc.Variable)
+        assert isinstance(psa.activation_energy_low_temperature, sc.Variable)
+        assert isinstance(psa.activation_energy_high_temperature, sc.Variable)
         assert isinstance(psa.preexponential_factor, sc.Variable)
         assert isinstance(psa.T0, sc.Variable)
         assert isinstance(psa.width, sc.Variable)
@@ -232,8 +232,8 @@ class TestPiecewiseSmoothArrhenius(unittest.TestCase):
         Test the initialisation of PiecewiseSmoothArrhenius class with priors
         """
         priors = (
-            uniform(0, 1),      # activation_energy_low
-            uniform(0, 1),      # activation_energy_high
+            uniform(0, 1),      # activation_energy_low_temperature
+            uniform(0, 1),      # activation_energy_high_temperature
             uniform(0, 1e20),   # preexponential_factor
             uniform(0, 1000),   # T0
             uniform(0, 100),    # width
@@ -241,8 +241,8 @@ class TestPiecewiseSmoothArrhenius(unittest.TestCase):
         psa = arrhenius.PiecewiseSmoothArrhenius(data, priors=priors)
         assert_equal(psa.function, arrhenius.piecewise_smooth_equation)
         assert psa.parameter_names == (
-            'activation_energy_low',
-            'activation_energy_high',
+            'activation_energy_low_temperature',
+            'activation_energy_high_temperature',
             'preexponential_factor',
             'T0',
             'width',
