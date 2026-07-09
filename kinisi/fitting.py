@@ -213,13 +213,15 @@ class FittingBase:
         :param n_burn: Number of burn-in samples. Optional, defaults to 500.
         :param n_thin: Thinning factor. Optional, defaults to 10.
         """
-        if isinstance(self.data_group[self.parameter_names[0]], Samples):
-            values = np.array([sc.mean(self.data_group[p]).value for p in self.parameter_names])
-        elif x0 is not None:
+        if x0 is not None:
+            if len(x0) != len(self.parameter_names):
+                raise ValueError('x0 must contain one initial value per parameter')
             for i, x in enumerate(x0):
                 if self.data_group[self.parameter_names[i]].unit != x.unit:
-                    raise TypeError('x0 input must have same unit as paramters')
+                    raise TypeError('x0 inputs must have the same units as parameters')
             values = np.array([x.value for x in x0])
+        elif isinstance(self.data_group[self.parameter_names[0]], Samples):
+            values = np.array([sc.mean(self.data_group[p]).value for p in self.parameter_names])
         else:
             values = np.array([self.data_group[p].value for p in self.parameter_names])
         pos = values + values * 1e-2 * np.random.randn(n_walkers, len(self.parameter_names))
