@@ -201,16 +201,31 @@ class FittingBase:
         for i, name in enumerate(self.parameter_names):
             self.data_group[name] = result[i] * self.parameter_units[i]
 
-    def mcmc(self, n_samples: int = 1000, n_walkers: int = 32, n_burn: int = 500, n_thin=10) -> None:
+    def mcmc(
+        self,
+        x0: tuple[sc.Variable] | None = None,
+        n_samples: int = 1000,
+        n_walkers: int = 32,
+        n_burn: int = 500,
+        n_thin: int = 10,
+    ) -> None:
         """
         Perform MCMC sampling of the model parameters.
 
-        :param n_samples: Number of samples to generate
-        :param n_walkers: Number of MCMC walkers
-        :param n_burn: Number of burn-in samples
-        :param n_thin: Thinning factor
+        :param x0: Initial starting position for MCMC sampling. Optional, defaults to max likelihood/aposteriori or mean of samples.
+        :param n_samples: Number of samples to generate. Optional, defaults to 1000.
+        :param n_walkers: Number of MCMC walkers. Optional, defaults to 32.
+        :param n_burn: Number of burn-in samples. Optional, defaults to 500.
+        :param n_thin: Thinning factor. Optional, defaults to 10.
         """
-        if isinstance(self.data_group[self.parameter_names[0]], Samples):
+        if x0 is not None:
+            if len(x0) != len(self.parameter_names):
+                raise ValueError('x0 must contain one initial value per parameter')
+            for i, x in enumerate(x0):
+                if self.data_group[self.parameter_names[i]].unit != x.unit:
+                    raise TypeError('x0 inputs must have the same units as parameters')
+            values = np.array([x.value for x in x0])
+        elif isinstance(self.data_group[self.parameter_names[0]], Samples):
             values = np.array([sc.mean(self.data_group[p]).value for p in self.parameter_names])
         else:
             values = np.array([self.data_group[p].value for p in self.parameter_names])

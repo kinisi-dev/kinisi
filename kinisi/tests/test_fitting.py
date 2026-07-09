@@ -11,6 +11,7 @@ Tests for fitting module
 import unittest
 
 import numpy as np
+import pytest
 import scipp as sc
 from numpy.testing import assert_almost_equal, assert_equal
 from scipy.stats import norm, uniform
@@ -142,6 +143,25 @@ class TestFittingBase(unittest.TestCase):
         assert isinstance(td.data_group['c'], Samples)
         assert td.data_group['m'].shape == (32,)
         assert td.data_group['c'].shape == (32,)
+
+    def test_mcmc_x0(self):
+        """
+        Test the MCMC sampling function with an x0 value.
+        """
+        td = fitting.FittingBase(data, straight_line, ('m', 'c'), (sc.Unit('m/s'), sc.Unit('m')))
+        td.mcmc(x0=(1 * sc.Unit('m/s'), 0.5 * sc.Unit('m')), n_samples=10, n_burn=5, n_walkers=32)
+        assert isinstance(td.data_group['m'], Samples)
+        assert isinstance(td.data_group['c'], Samples)
+        assert td.data_group['m'].shape == (32,)
+        assert td.data_group['c'].shape == (32,)
+
+    def test_mcmc_x0_wrong_unit(self):
+        """
+        Test the MCMC sampling function with an x0 value.
+        """
+        td = fitting.FittingBase(data, straight_line, ('m', 'c'), (sc.Unit('m/s'), sc.Unit('m')))
+        with pytest.raises(TypeError):
+            td.mcmc(x0=(1 * sc.Unit('m'), 0.5 * sc.Unit('m')), n_samples=10, n_burn=5, n_walkers=32)
 
     def test_nested_sampling(self):
         """
