@@ -9,9 +9,9 @@ Tests for fitting module
 # pylint: disable=R0201
 
 import unittest
-import pytest
 
 import numpy as np
+import pytest
 import scipp as sc
 from numpy.testing import assert_almost_equal, assert_equal
 from scipy.stats import norm, uniform
@@ -143,7 +143,7 @@ class TestFittingBase(unittest.TestCase):
         assert isinstance(td.data_group['c'], Samples)
         assert td.data_group['m'].shape == (32,)
         assert td.data_group['c'].shape == (32,)
-    
+
     def test_mcmc_x0(self):
         """
         Test the MCMC sampling function with an x0 value.
@@ -153,7 +153,7 @@ class TestFittingBase(unittest.TestCase):
         assert isinstance(td.data_group['m'], Samples)
         assert isinstance(td.data_group['c'], Samples)
         assert td.data_group['m'].shape == (32,)
-        assert td.data_group['c'].shape == (32,) 
+        assert td.data_group['c'].shape == (32,)
 
     def test_mcmc_x0_wrong_unit(self):
         """
