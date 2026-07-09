@@ -201,9 +201,14 @@ class FittingBase:
         for i, name in enumerate(self.parameter_names):
             self.data_group[name] = result[i] * self.parameter_units[i]
 
-    def mcmc(
-        self, x0: tuple[sc.Variable] = None, n_samples: int = 1000, n_walkers: int = 32, n_burn: int = 500, n_thin=10
-    ) -> None:
+def mcmc(
+    self,
+    x0: tuple[sc.Variable, ...] | None = None,
+    n_samples: int = 1000,
+    n_walkers: int = 32,
+    n_burn: int = 500,
+    n_thin: int = 10,
+) -> None:
         """
         Perform MCMC sampling of the model parameters.
 
