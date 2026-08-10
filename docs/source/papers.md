@@ -36,15 +36,16 @@ Here we will try and list publications that have used `kinisi` (if you would lik
 32. Nishimura, S.-I., Suzuki, H., Park, S., Hasegawa, K., & Yamada, A., *ChemRvix*, 2026. doi:[10.26434/chemrxiv-2026-5d9nq-v2](https://doi.org/10.26434/chemrxiv.10001514/v1).
 33. Lin, M., Lambrick, S. M., & Jardine, A. J., *Phys. Rev. B*, **113**, 085418, 2026. doi:[10.1103/rys7-5t69](https://doi.org/10.1103/rys7-5t69)
 34. Tang, W., Wang, F., Liang, S., Hussain, F., Tseng, J., Yu, P., Lei, J., Jin, H., Zhao, C., Zhang, H., Shi, Z., Li, Y., Yin, W., Ren, F., Wang, S., Ma, Z-F., Sun, X. & Xia, W., *Nat. Commun*, **17**, 3326, 2026. doi:[10.1038/s41467-026-69737-x](http://doi.org/10.1038/s41467-026-69737-x)
-35. Richardson, H., McColl, K., Nilsen, G., Armstrong, J. & McCluskey, A. R., *J. Phys. Chem. Lett.*, **XXX**, XXX, 2026. doi:[10.1021/acs.jpclett.6c01399](https://doi.org/10.1021/acs.jpclett.6c01399).
+35. Richardson, H., McColl, K., Nilsen, G., Armstrong, J. & McCluskey, A. R., *J. Phys. Chem. Lett.*, **17**, 8411, 2026. doi:[10.1021/acs.jpclett.6c01399](https://doi.org/10.1021/acs.jpclett.6c01399).
 36. Kabakibo, D. S., F. Therrien, Y. Bengio, M. Côté, H. Guo, H. Shin, & Hernandez-Garcia, A., 2026. [*arXiv*:2602.28012](https://arxiv.org/abs/2603.28012).
 37. Shantsila, R., C. Baer, A. Bartók-Pártay, & B. Karasulu, *ChemRvix*, 2026. doi:[10.26434/chemrxiv.15001544/v1](https://doi.org/10.26434/chemrxiv.15001544/v1).
 38. Coles, S. W., Hajibabaei, A., Kapil, V., Advincula, X. R. Schran, C. Cox, S. J., & Michaelides, A. *Sci. Adv.*, **12**, eadz6392, 2026. doi:[10.1126/sciadv.adz6392](https://doi.org/10.1126/sciadv.adz6392).
 39. Kashyrina, Ya. O., Muratov, A. S., Kashirina, N. I., Zolotarenjo, Ol. D., Zolotarenjo, An. D., & Roik, O. S. *Solid State Comm.*, **415**, 116466, 2026. doi:[10.1016/j.ssc.2026.116466](https://doi.org/10.1016/j.ssc.2026.116466).
 40. Nguyen, H. O., Hörmann, J., Williamson, B. A. D., Kanedal, M., Todt, J., Maletić, F., Erker, S., Redhammer, G. J., Schell, N., Keckes, J., Latz, A., Danner, T., & Rettenwander, D. *ChemRvix*, 2026. doi:[10.26434/chemrxiv.15002843/v1](https://doi.org/10.26434/chemrxiv.15002843/v1).
-41. Morgan, B. J., & McCluskey, A. R. *ChemRvix*, 2026. doi:[10.26434/chemrxiv-2025-gdbv9/v4](https://doi.org/10.26434/chemrxiv-2025-gdbv9/v4).
+41. Morgan, B. J., & McCluskey, A. R. *Solid State Ionics*, **444**, 117249, 2026. doi:[10.26434/chemrxiv-2025-gdbv9/v4](https://doi.org/10.26434/chemrxiv-2025-gdbv9/v4).
 42. Kang, L., Yu, X., Dong, J., Yan, K., & Zhang, Z., *ACS Omega*, **11**, 31156-31168, 2026. doi:[10.1021/acsomega.6c00765](https://doi.org/10.1021/acsomega.6c00765).
 43. Budianto, B., *Heat and Mass Transfer*, **62**, 74, 2026. doi:[10.1007/s00231-026-03700-w](https://doi.org/10.1007/s00231-026-03700-w).
 44. Greene, S. M., Cabana, J., & Siegel, D. J., *ChemRvix*, 2026. doi:[10.26434/chemrxiv.15003876/v1](https://doi.org/10.26434/chemrxiv.15003876/v1).
 45. Ouyang, Y., Xiang, X., Zhang, Y., Li, X., Zhou, Y., Wang, Z. L., & Wei, D. *Small*, **22**, e73728, 2026. doi:[10.1002/smll.73728](https://doi.org/10.1002/smll.73728).
 46. Kosmala, A., Günnemann, S., Gao, M., & Wood, B., 2026 [*arXiv*:2606.02455](https://arxiv.org/abs/2606.02455).
+47. McCluskey, A. R., Coles, S. W., & Morgan, B. J., *PRX Energy*, **5**, 022001, 2026. doi:[10.1103/nxgq-lmp6](https://doi.org/10.1103/nxgq-lmp6).
