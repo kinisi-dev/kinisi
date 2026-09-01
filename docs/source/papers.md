@@ -49,3 +49,4 @@ Here we will try and list publications that have used `kinisi` (if you would lik
 45. Ouyang, Y., Xiang, X., Zhang, Y., Li, X., Zhou, Y., Wang, Z. L., & Wei, D. *Small*, **22**, e73728, 2026. doi:[10.1002/smll.73728](https://doi.org/10.1002/smll.73728).
 46. Kosmala, A., Günnemann, S., Gao, M., & Wood, B., 2026 [*arXiv*:2606.02455](https://arxiv.org/abs/2606.02455).
 47. McCluskey, A. R., Coles, S. W., & Morgan, B. J., *PRX Energy*, **5**, 022001, 2026. doi:[10.1103/nxgq-lmp6](https://doi.org/10.1103/nxgq-lmp6).
+48. TWinter, G., Nam, J., Gomez-Bombarelli, R., 2026. [*arXiv*:2608.21624](https://arxiv.org/abs/2608.21624).
