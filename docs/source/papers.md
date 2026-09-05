@@ -49,4 +49,8 @@ Here we will try and list publications that have used `kinisi` (if you would lik
 45. Ouyang, Y., Xiang, X., Zhang, Y., Li, X., Zhou, Y., Wang, Z. L., & Wei, D. *Small*, **22**, e73728, 2026. doi:[10.1002/smll.73728](https://doi.org/10.1002/smll.73728).
 46. Kosmala, A., Günnemann, S., Gao, M., & Wood, B., 2026 [*arXiv*:2606.02455](https://arxiv.org/abs/2606.02455).
 47. McCluskey, A. R., Coles, S. W., & Morgan, B. J., *PRX Energy*, **5**, 022001, 2026. doi:[10.1103/nxgq-lmp6](https://doi.org/10.1103/nxgq-lmp6).
-48. TWinter, G., Nam, J., Gomez-Bombarelli, R., 2026. [*arXiv*:2608.21624](https://arxiv.org/abs/2608.21624).
+48. Winter, G., Nam, J., Gomez-Bombarelli, R., 2026. [*arXiv*:2608.21624](https://arxiv.org/abs/2608.21624).
+49. Pegoraro, M., Christensen, R., Sørensen, S. S., Lindbjerg, A. R., Du, T., Bleile, Y. B., Svane, A. M., Biscio, C. A. N., Fajstrup, L. & Smedskjaer, M. M., *Nat. Comm.*, **XX**, XX, 2026. doi:[10.1038/s41467-026-77363-w](https://doi.org/10.1038/s41467-026-77363-w).
+50. Neporozhnii, I., Wang, Z., Bajpai, R., Gomez, C., Chakraborty, N., Dong, T., Tamblyn, I., Hoogland, S., & Voznyy, O., *PRX Intelligence*, **1**, 013014, 2026. doi:[10.1103/g86f-dn26](https://doi.org/10.1103/g86f-dn26).
+51. Kashyrina, Ya. O., Muratov, A. S., Kashirina, N. I., Zolotarenko, Ol. D., Zolotarenko, An. D., Roik, O. S., *Solid State Ionics*, **415**, 116466, 2026. doi:[10.1016/j.ssc.2026.116466](https://doi.org/10.1016/j.ssc.2026.116466).
+
