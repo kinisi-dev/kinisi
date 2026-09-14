@@ -6,6 +6,8 @@ Calculate the diffusion coefficient.
 # Distributed under the terms of the MIT License.
 # author: Andrew R. McCluskey (arm61) and Oskar G. Soulas (osoulas)
 
+import warnings
+
 import numpy as np
 import scipp as sc
 from emcee import EnsembleSampler
@@ -95,6 +97,8 @@ class Diffusion:
         start_dt: sc.Variable,
         cond_max: float = 1e16,
         recondition: bool = False,
+        check_consistency: bool = True,
+        warn_threshold: float = 0.7,
         fit_intercept: bool = True,
         n_samples: int = 1000,
         n_walkers: int = 32,
@@ -109,6 +113,8 @@ class Diffusion:
         :param start_dt: The time at which the diffusion regime begins.
         :param cond_max: The maximum condition number of the covariance matrix. Optional, default is :py:attr:`1e16`.
         :param recondition: Whether to recondition the covariance matrix. Optional, default is :py:attr:`False`.
+        :param check_consistency: Whether to compare the fitted gradient against an ordinary least squares estimate and warn if they disagree. Optional, default is :py:attr:`True`.
+        :param warn_threshold: The ratio below which a warning is raised. Optional, default is :py:attr:`0.7`.
         :param fit_intercept: Whether to fit an intercept. Optional, default is :py:attr:`True`.
         :param n_samples: The number of MCMC samples to take. Optional, default is :py:attr:`1000`.
         :param n_walkers: The number of walkers to use in the MCMC. Optional, default is :py:attr:`32`.
@@ -148,6 +154,7 @@ class Diffusion:
             return logl
 
         ols = linregress(x_values, y_values)
+        self._ols_gradient = ols.slope
         slope = ols.slope
         intercept = 1e-20
         if slope < 0:
@@ -169,6 +176,56 @@ class Diffusion:
 
         if fit_intercept:
             self.intercept = Samples(self._flatchain[:, 1], unit=self.dg['da'].unit)
+
+        if check_consistency:
+            self._check_consistency(warn_threshold)
+
+    def _check_consistency(self, warn_threshold: float = 0.7):
+        """
+        Compare the fitted gradient against an ordinary least squares estimate of the same data.
+
+        The generalised least squares fit performed by :py:func:`bayesian_regression` weights the
+        observations by the inverse of an estimated covariance matrix. Where sampling noise has
+        made that matrix numerically singular, the inversion can return a gradient in error by
+        several orders of magnitude without any other indication of failure.
+
+        An ordinary least squares fit to the same observations does not use the covariance and so
+        cannot be affected in the same way. It is a less precise estimator, but a robust one, and
+        a large disagreement between the two is evidence that the covariance is unreliable rather
+        than that the data are unusual.
+
+        :param warn_threshold: The ratio of the fitted gradient to the ordinary least squares
+            gradient below which a warning is raised. Optional, default is :py:attr:`0.7`.
+        """
+        if getattr(self, '_ols_gradient', None) is None or self._ols_gradient <= 0:
+            return
+
+        ratio = np.median(self.gradient.values) / self._ols_gradient
+        self._consistency_ratio = ratio
+
+        if ratio < warn_threshold:
+            warnings.warn(
+                f'The fitted gradient is {ratio:.3f} times the ordinary least squares estimate. '
+                'A ratio this low indicates that the covariance matrix may be numerically '
+                'singular and that the diffusion coefficient may be unreliable. Consider '
+                'refitting with recondition=True, or inspecting the eigenvalues of '
+                'Diffusion.covariance_matrix.',
+                UserWarning,
+                stacklevel=3,
+            )
+
+    @property
+    def consistency_ratio(self) -> float:
+        """
+        The ratio of the fitted gradient to an ordinary least squares estimate of the same data.
+
+        A value near unity indicates the two estimators agree. A value well below unity indicates
+        that the covariance-weighted fit has been affected by a numerically singular covariance
+        matrix. :py:attr:`None` if the check has not been run.
+
+        :return: The ratio of the two gradient estimates.
+        """
+        return getattr(self, '_consistency_ratio', None)
 
     def _diffusion(self, start_dt: sc.Variable, **kwargs):
         """

@@ -7,12 +7,14 @@ Tests for diffusion module
 # @author: Andrew R. McCluskey (arm61) & Harry Richardson (Harry-Rich)
 
 import unittest
+import warnings
 
 import numpy as np
 import pytest
 import scipp as sc
 
 from kinisi.diffusion import Diffusion, _straight_line, eigenvalue_clipping, marchenkopastur, minimum_eigenvalue_method
+from kinisi.samples import Samples
 from kinisi.tests import TEST_FILE_PATH
 
 # Random seed setting not yet implemented into bayesian regression and so cannot almost_equal
@@ -144,3 +146,72 @@ class TestDiffusion(unittest.TestCase):
 
         with pytest.raises(ValueError, match='Units of the covariance matrix and mu do not align correctly'):
             diff_exc.posterior_predictive(n_posterior_samples=1, n_predictive_samples=400)
+
+
+class TestConsistencyCheck(unittest.TestCase):
+    """
+    Testing the covariance consistency check.
+    """
+
+    @staticmethod
+    def _datagroup(gradient=6.0, n_points=64, seed=0):
+        """
+        A DataGroup with a straight-line mean-squared displacement and a
+        realistic number of independent samples at each lag time.
+        """
+        rng = np.random.RandomState(seed)
+        dt = np.arange(2, 2 + n_points, dtype=float)
+        n_samples = 4096.0 / dt
+        variances = 24.0 * dt**2 / n_samples
+        values = gradient * dt + rng.normal(0, np.sqrt(variances) * 0.05)
+        da = sc.DataArray(
+            sc.array(dims=['time interval'], values=values, variances=variances, unit='angstrom**2'),
+            coords={
+                'time interval': sc.array(dims=['time interval'], values=dt, unit='ps'),
+                'n_samples': sc.array(dims=['time interval'], values=n_samples),
+            },
+        )
+        return sc.DataGroup({'da': da, 'dimensionality': sc.scalar(3)})
+
+    def _fit(self, **kwargs):
+        diff = Diffusion(self._datagroup(**kwargs))
+        diff.bayesian_regression(sc.scalar(2.0, unit='ps'), progress=False, n_samples=200, n_burn=100)
+        return diff
+
+    def test_ratio_is_near_unity_for_a_healthy_fit(self):
+        diff = self._fit()
+        assert 0.8 < diff.consistency_ratio < 1.25
+
+    def test_no_warning_for_a_healthy_fit(self):
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter('always')
+            self._fit(seed=1)
+        assert not [w for w in caught if 'ordinary least squares' in str(w.message)]
+
+    def test_warning_when_the_gradient_is_suppressed(self):
+        diff = self._fit()
+        diff.gradient = Samples(diff.gradient.values * 0.01, unit=diff.gradient.unit)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter('always')
+            diff._check_consistency()
+        assert any('ordinary least squares' in str(w.message) for w in caught)
+        assert diff.consistency_ratio < 0.7
+
+    def test_threshold_is_respected(self):
+        diff = self._fit()
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter('always')
+            diff._check_consistency(warn_threshold=1.5)
+        assert any('ordinary least squares' in str(w.message) for w in caught)
+
+    def test_check_can_be_disabled(self):
+        diff = Diffusion(self._datagroup())
+        diff.bayesian_regression(
+            sc.scalar(2.0, unit='ps'), progress=False, n_samples=200, n_burn=100, check_consistency=False
+        )
+        assert diff.consistency_ratio is None
+
+    def test_check_is_safe_before_a_regression(self):
+        diff = Diffusion(self._datagroup())
+        diff._check_consistency()
+        assert diff.consistency_ratio is None
