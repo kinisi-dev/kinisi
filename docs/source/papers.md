@@ -13,7 +13,7 @@ Here we will try and list publications that have used `kinisi` (if you would lik
 9. McCluskey, A. R., Coles, S. W., Morgan, B. J. , *J. Chem. Theory Comput.*, **21**, 79-87, 2025. doi:[10.1021/acs.jctc.4c01249](https://doi.org/10.1021/acs.jctc.4c01249).
 10. Klarbring, J., Walsh, A., *Chem. Mater*, **36**, 9406–9413, 2024. doi:[10.1021/acs.chemmater.4c00936](https://doi.org/10.1021/acs.chemmater.4c00936).
 11. Nam, J., Liu, S., Winter, G., Jun, K., Yang, S., Gómez-Bombarelli, R., *Nat. Mach. Intell.*, **7**, 1625-1635, 2025. doi:[10.1038/s42256-025-01125-4](https://doi.org/10.1038/s42256-025-01125-4).
-12. Ravindra, R., Advincula, X. R., Shi, B. X., Coles, S. W., Michaelides, A., Kapil, V., *Chem. Sci.*, Advance Article, 2026. doi:[10.1039/D6SC00138F](https://doi.org/10.1039/D6SC00138F).
+12. Ravindra, R., Advincula, X. R., Shi, B. X., Coles, S. W., Michaelides, A., Kapil, V., *Chem. Sci.*, **17**, 11466-11472, 2026. doi:[10.1039/D6SC00138F](https://doi.org/10.1039/D6SC00138F).
 13. Song, J.-I., Choi, Y.-S., *J. Power Sources*, **626**, 235765, 2025. doi:[10.1016/j.jpowsour.2024.235765](https://doi.org/10.1016/j.jpowsour.2024.235765).
 14. Quek, A, Ouyang, N., Lin, H.-M., Delaire, O., Guilleminot, J., *Mech. Mat.*, **202**, 105237, 2025. doi:[10.1016/j.mechmat.2024.105237](https://doi.org/10.1016/j.mechmat.2024.105237).
 15. Sasaki, R., Tateyama, Y., Searles, D. J., *PRX Energy*, **4**, 013005, 2025. doi:[10.1103/PRXEnergy.4.013005](https://doi.org/10.1103/PRXEnergy.4.013005).
@@ -29,11 +29,11 @@ Here we will try and list publications that have used `kinisi` (if you would lik
 25. Leifield, J. Parsons, A. C., Morscher, A., Martinez de Irujo-Labalde, X., Kraft, M. A., Soulas, O. G., Samanta, B., Zielasko, W., Yadav, N. Jalarvo, N., Rodrigues, B. V. M., Slabon, A., Adelhelm, P., Hansen, M. R., Scanlon, D. O., Zeier, W. G., & Squires, A. G., *Adv. Energy Mater.*, **XX**, e70977, 2026. doi:[10.26434/chemrxiv-2025-27tgk](https://doi.org/10.26434/chemrxiv-2025-27tgk).
 26. Goldmann, B. A., Rosenbach, C., Evans, H. A., Helm, B., Wankmiller, B., Maus, O., Suard, E., Nazar, L. F., Hansen, M. R., Morgan, B. J., Islam, M. S., Zeier, W. G., *Chem Mater.*, **37**, 9858–9868, 2025. doi:[10.1021/acs.chemmater.5c02303](https://doi.org/10.1021/acs.chemmater.5c02303).
 27. du Toit, D. T.. Optimising machine-learning interatomic potentials for the study of disordered functional materials, *Ph.D. Thesis, University of Oxford*, 2025. eprint: [dnc580n38t](https://ora.ox.ac.uk/objects/uuid:f1758549-6453-43cd-8a0d-ae886f07fdac/files/dnc580n38t).
-28. Majumdar, S., Roy, S., Jun, K., Steiner, M., & Gomez-Bombarelli, R., *Chem. Mater*, 3971–3981, 2026. doi:[10.1021/acs.chemmater.5c02940](https://doi.org/10.1021/acs.chemmater.5c02940).
+28. Majumdar, S., Roy, S., Jun, K., Steiner, M., & Gomez-Bombarelli, R., *Chem. Mater*, **38**, 3971–3981, 2026. doi:[10.1021/acs.chemmater.5c02940](https://doi.org/10.1021/acs.chemmater.5c02940).
 29. Baer, C. M. I., Shantsila, R. Figiel, L., & Karasulu, B., *J. Mater. Chem. A*, **14**, 20245-20260, 2026. doi:[10.1039/D6TA00922K](https://doi.org/10.1039/D6TA00922K). 
 30. Ito, D., Momma, T., & Tateyama, Y., *Chem. Mater.*, **38**, 1144–1153, 2026. doi: [10.1021/acs.chemmater.5c02436](https://doi.org/10.1021/acs.chemmater.5c02436). 
 31. Lavrinenko, A. K., Famprikis, T., Landgraf, V., Heringa, J. R., Smeets, S., Azizi, V., Ciarella, S., Wagemaker, M., & Vasileiadis, A., *npj Comput. Mater.*, **XX**, 2026. doi:[10.1038/s41524-026-02133-7](https://doi.org/10.1038/s41524-026-02133-7).
-32. Nishimura, S.-I., Suzuki, H., Park, S., Hasegawa, K., & Yamada, A., *ChemRvix*, 2026. doi:[10.26434/chemrxiv-2026-5d9nq-v2](https://doi.org/10.26434/chemrxiv.10001514/v1).
+32. Nishimura, S.-I., Suzuki, H., Park, S., Hasegawa, K., & Yamada, A., *J. Am. Chem. Soc*, **148**, 40043-40052, 2026. doi:[10.1021/jacs.6c11612](https://doi.org/10.1021/jacs.6c11612).
 33. Lin, M., Lambrick, S. M., & Jardine, A. J., *Phys. Rev. B*, **113**, 085418, 2026. doi:[10.1103/rys7-5t69](https://doi.org/10.1103/rys7-5t69)
 34. Tang, W., Wang, F., Liang, S., Hussain, F., Tseng, J., Yu, P., Lei, J., Jin, H., Zhao, C., Zhang, H., Shi, Z., Li, Y., Yin, W., Ren, F., Wang, S., Ma, Z-F., Sun, X. & Xia, W., *Nat. Commun*, **17**, 3326, 2026. doi:[10.1038/s41467-026-69737-x](http://doi.org/10.1038/s41467-026-69737-x)
 35. Richardson, H., McColl, K., Nilsen, G., Armstrong, J. & McCluskey, A. R., *J. Phys. Chem. Lett.*, **17**, 8411, 2026. doi:[10.1021/acs.jpclett.6c01399](https://doi.org/10.1021/acs.jpclett.6c01399).
@@ -50,7 +50,8 @@ Here we will try and list publications that have used `kinisi` (if you would lik
 46. Kosmala, A., Günnemann, S., Gao, M., & Wood, B., 2026 [*arXiv*:2606.02455](https://arxiv.org/abs/2606.02455).
 47. McCluskey, A. R., Coles, S. W., & Morgan, B. J., *PRX Energy*, **5**, 022001, 2026. doi:[10.1103/nxgq-lmp6](https://doi.org/10.1103/nxgq-lmp6).
 48. Winter, G., Nam, J., Gomez-Bombarelli, R., 2026. [*arXiv*:2608.21624](https://arxiv.org/abs/2608.21624).
-49. Pegoraro, M., Christensen, R., Sørensen, S. S., Lindbjerg, A. R., Du, T., Bleile, Y. B., Svane, A. M., Biscio, C. A. N., Fajstrup, L. & Smedskjaer, M. M., *Nat. Comm.*, **XX**, XX, 2026. doi:[10.1038/s41467-026-77363-w](https://doi.org/10.1038/s41467-026-77363-w).
+49. Pegoraro, M., Christensen, R., Sørensen, S. S., Lindbjerg, A. R., Du, T., Bleile, Y. B., Svane, A. M., Biscio, C. A. N., Fajstrup, L. & Smedskjaer, M. M., *Nat. Comm.*, **17**, 10343, 2026. doi:[10.1038/s41467-026-77363-w](https://doi.org/10.1038/s41467-026-77363-w).
 50. Neporozhnii, I., Wang, Z., Bajpai, R., Gomez, C., Chakraborty, N., Dong, T., Tamblyn, I., Hoogland, S., & Voznyy, O., *PRX Intelligence*, **1**, 013014, 2026. doi:[10.1103/g86f-dn26](https://doi.org/10.1103/g86f-dn26).
 51. Kashyrina, Ya. O., Muratov, A. S., Kashirina, N. I., Zolotarenko, Ol. D., Zolotarenko, An. D., Roik, O. S., *Solid State Ionics*, **415**, 116466, 2026. doi:[10.1016/j.ssc.2026.116466](https://doi.org/10.1016/j.ssc.2026.116466).
+52. Lin, S., Rocke, T., Holec, D., Hultman, L., Mayrhofer, P. H., Sangiovanni, D. G., Kermode, J. R., Koutná, N., *Appl. Phys. Lett.*, **129**, 111903, 2026. doi:[10.1063/5.0329286](https://doi.org/10.1063/5.0329286).
 
