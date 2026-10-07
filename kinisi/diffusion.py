@@ -106,6 +106,8 @@ class Diffusion:
         n_thin: int = 10,
         progress: bool = True,
         random_state: np.random.mtrand.RandomState = None,
+        model=False,
+        mem=False
     ):
         """
         Perform the Bayesian regression with a linear model against the observed data.
@@ -135,8 +137,13 @@ class Diffusion:
         self._consistency_ratio = None
         self._consistency_z = None
 
+<<<<<<< HEAD
         self.diff_regime = self._diff_regime_index()
         self._covariance_matrix = self.compute_covariance_matrix()
+=======
+        self.diff_regime = np.argwhere(self.dg['da'].coords['time interval'] >= self._start_dt)[0][0]
+        self._covariance_matrix = self.compute_covariance_matrix(model=model, mem=mem)
+>>>>>>> 56025f3 (Some options for the covariance work)
 
         x_values = self.dg['da'].coords['time interval'][self.diff_regime :].values
         y_values = self.dg['da']['time interval', self.diff_regime :].values
@@ -331,26 +338,37 @@ class Diffusion:
         """
         return getattr(self, '_sigma', None)
 
-    def compute_covariance_matrix(self) -> sc.Variable:
+    def compute_covariance_matrix(self, model=True, mem=False) -> sc.Variable:
         """
         Compute the covariance matrix for the diffusion coefficient calculation.
 
         :returns: A :py:mod:`scipp` object containing the covariance matrix.
         """
+        def _model_variance(dt: np.ndarray, a: float) -> np.ndarray:
+            """
+            Determine the model variance, based on a quadratic relationship with the number of
+            independent samples as a divisor.
+
+            :param dt: Timestep value
+            :param a: Quadratic coefficient
+            :return: Model variances
+            """
+            return a / self.dg['da'].coords['n_samples'].values[self.diff_regime :] * dt**2
+
+        self._popt, _ = curve_fit(_model_variance, self.dg['da'].coords['time interval'].values, self.dg['da'].data.variances[self.diff_regime :])
+        self._model_v = _model_variance(self.dg['da'].coords['time interval'].values, *self._popt)
+        
         cov = np.zeros((self.dg['da'].data.variances.size, self.dg['da'].data.variances.size))
         for i in range(0, self.dg['da'].data.variances.size):
             for j in range(i, self.dg['da'].data.variances.size):
                 ratio = self.dg['da'].coords['n_samples'].values[i] / self.dg['da'].coords['n_samples'].values[j]
-                value = ratio * self.dg['da'].data.variances[i]
+                if model:
+                    value = ratio * self._model_v[i]
+                else:
+                    value = ratio * self.dg['da'].data.variances[i]
                 cov[i, j] = value
                 cov[j, i] = np.copy(cov[i, j])
-        if self._recondition:
-            return sc.array(
-                dims=['time_interval1', 'time_interval2'],
-                values=cov_nearest(eigenvalue_clipping(cov_nearest(cov[self.diff_regime :, self.diff_regime :]))),
-                unit=self.dg['da'].unit ** 2,
-            )
-        else:
+        if mem:
             return sc.array(
                 dims=['time_interval1', 'time_interval2'],
                 values=cov_nearest(
@@ -358,6 +376,12 @@ class Diffusion:
                 ),
                 unit=self.dg['da'].unit ** 2,
             )
+        else:
+            return sc.array(
+                            dims=['time_interval1', 'time_interval2'],
+                            values=cov[self.diff_regime :, self.diff_regime :],
+                            unit=self.dg['da'].unit ** 2,
+                        )
 
     def posterior_predictive(
         self, n_posterior_samples: int = None, n_predictive_samples: int = 256, progress: bool = True
@@ -432,63 +456,6 @@ def minimum_eigenvalue_method(cov: np.ndarray, cond_max=1e16) -> np.ndarray:
     new_eigenvalues = np.maximum(eigenvalues, T)
     new_cov = np.real(eigenvectors @ np.diag(new_eigenvalues) @ eigenvectors.T)
     return new_cov
-
-
-def eigenvalue_clipping(cov: np.ndarray) -> np.ndarray:
-    """
-    Eigenvalue clipping method for matrix reconditioning.
-
-    :param cov: Covariance matrix to recondition.
-
-    :return: Reconditioned covariance matrix.
-    """
-    corr = cov2corr(cov)
-    eigenthings = np.linalg.eig(corr)
-    eigenvalues = eigenthings.eigenvalues.real
-
-    kde = gaussian_kde(eigenvalues)
-    x = np.linspace(eigenvalues.min() - 0.5 * eigenvalues.max(), eigenvalues.max() + 0.5 * eigenvalues.max(), 10000)
-
-    popt, _ = curve_fit(marchenkopastur, x, kde.pdf(x), bounds=([0, 0], [np.inf, np.inf]), p0=[0.5, 1.0])
-
-    lambda_plus = (1 + popt[0] ** 0.5) ** 2
-    lambda_minus = (1 - popt[0] ** 0.5) ** 2
-
-    lambda_minus = np.max(eigenvalues[eigenvalues < lambda_plus])
-    new_eigenvalues = np.copy(eigenvalues)
-    new_eigenvalues[new_eigenvalues < lambda_plus] = lambda_minus
-
-    new_corr = (eigenthings.eigenvectors @ np.diag(new_eigenvalues) @ np.linalg.inv(eigenthings.eigenvectors)).real
-    S = np.diag(1 / (np.diag(new_corr)) ** 0.5)
-    new_corr = S @ new_corr @ S.T
-
-    new_cov = corr2cov(new_corr, np.sqrt(cov.diagonal()))
-    return new_cov
-
-
-def marchenkopastur(x: np.ndarray, lambda_: float, sigma: float) -> np.ndarray:
-    """
-    Marchenko-Pastur distribution
-
-    :param x: points at which to evaluate the distribution
-    :param lambda_: lambda parameter
-    :param sigma: standard deviation of the distribution
-    """
-
-    def m0(a: np.ndarray) -> np.ndarray:
-        """
-        Element wise maximum of (a, 0)
-
-        :param a: input array
-        :return: element wise maximum of (a, 0)
-        """
-        return np.maximum(a, np.zeros_like(a))
-
-    lambda_plus = (1 + lambda_**0.5) ** 2
-    lambda_minus = (1 - lambda_**0.5) ** 2
-
-    return np.sqrt(m0(lambda_plus - x) * m0(x - lambda_minus)) / (2 * np.pi * sigma**2 * lambda_ * x)
-
 
 def _straight_line(abscissa: np.ndarray, gradient: float, intercept: float = 0.0) -> np.ndarray:
     """
