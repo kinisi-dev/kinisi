@@ -137,13 +137,8 @@ class Diffusion:
         self._consistency_ratio = None
         self._consistency_z = None
 
-<<<<<<< HEAD
         self.diff_regime = self._diff_regime_index()
-        self._covariance_matrix = self.compute_covariance_matrix()
-=======
-        self.diff_regime = np.argwhere(self.dg['da'].coords['time interval'] >= self._start_dt)[0][0]
         self._covariance_matrix = self.compute_covariance_matrix(model=model, mem=mem)
->>>>>>> 56025f3 (Some options for the covariance work)
 
         x_values = self.dg['da'].coords['time interval'][self.diff_regime :].values
         y_values = self.dg['da']['time interval', self.diff_regime :].values
