@@ -98,7 +98,7 @@ class Diffusion:
         cond_max: float = 1e16,
         recondition: bool = False,
         check_consistency: bool = True,
-        warn_threshold: float = 0.7,
+        z_threshold: float = 3.0,
         fit_intercept: bool = True,
         n_samples: int = 1000,
         n_walkers: int = 32,
@@ -113,8 +113,8 @@ class Diffusion:
         :param start_dt: The time at which the diffusion regime begins.
         :param cond_max: The maximum condition number of the covariance matrix. Optional, default is :py:attr:`1e16`.
         :param recondition: Whether to recondition the covariance matrix. Optional, default is :py:attr:`False`.
-        :param check_consistency: Whether to compare the fitted gradient against an ordinary least squares estimate and warn if they disagree. Optional, default is :py:attr:`True`.
-        :param warn_threshold: The ratio below which a warning is raised. Optional, default is :py:attr:`0.7`.
+        :param check_consistency: Whether to compare the generalised least squares gradient against an ordinary least squares estimate and warn if they disagree by more than the noise in the data allows. Optional, default is :py:attr:`True`.
+        :param z_threshold: The magnitude of the consistency statistic, :py:attr:`consistency_z`, above which a warning is raised. Optional, default is :py:attr:`3.0`.
         :param fit_intercept: Whether to fit an intercept. Optional, default is :py:attr:`True`.
         :param n_samples: The number of MCMC samples to take. Optional, default is :py:attr:`1000`.
         :param n_walkers: The number of walkers to use in the MCMC. Optional, default is :py:attr:`32`.
@@ -129,6 +129,8 @@ class Diffusion:
         self._start_dt = sc.to_unit(start_dt, self.dg['da'].coords['time interval'].unit)
         self._cond_max = cond_max
         self._recondition = recondition
+        self._consistency_ratio = None
+        self._consistency_z = None
 
         self.diff_regime = self._diff_regime_index()
         self._covariance_matrix = self.compute_covariance_matrix()
@@ -152,6 +154,11 @@ class Diffusion:
             diff = model - y_values
             logl = -0.5 * (logdet + np.matmul(diff.T, np.matmul(inv, diff)))
             return logl
+
+        if check_consistency:
+            self._consistency_z = _check_consistency(
+                *_gradient_estimates(x_values, y_values, self._covariance_matrix.values, fit_intercept), z_threshold
+            )
 
         ols = linregress(x_values, y_values)
         self._ols_gradient = ols.slope
@@ -182,8 +189,8 @@ class Diffusion:
         else:
             self.intercept = None
 
-        if check_consistency:
-            self._check_consistency(warn_threshold)
+        if check_consistency and self._ols_gradient > 0:
+            self._consistency_ratio = np.median(self.gradient.values) / self._ols_gradient
 
     def _diff_regime_index(self) -> int:
         """
@@ -202,52 +209,35 @@ class Diffusion:
             )
         return indices[0][0]
 
-    def _check_consistency(self, warn_threshold: float = 0.7):
-        """
-        Compare the fitted gradient against an ordinary least squares estimate of the same data.
-
-        The generalised least squares fit performed by :py:func:`bayesian_regression` weights the
-        observations by the inverse of an estimated covariance matrix. Where sampling noise has
-        made that matrix numerically singular, the inversion can return a gradient in error by
-        several orders of magnitude without any other indication of failure.
-
-        An ordinary least squares fit to the same observations does not use the covariance and so
-        cannot be affected in the same way. It is a less precise estimator, but a robust one, and
-        a large disagreement between the two is evidence that the covariance is unreliable rather
-        than that the data are unusual.
-
-        :param warn_threshold: The ratio of the fitted gradient to the ordinary least squares
-            gradient below which a warning is raised. Optional, default is :py:attr:`0.7`.
-        """
-        if getattr(self, '_ols_gradient', None) is None or self._ols_gradient <= 0:
-            return
-
-        ratio = np.median(self.gradient.values) / self._ols_gradient
-        self._consistency_ratio = ratio
-
-        if ratio < warn_threshold:
-            warnings.warn(
-                f'The fitted gradient is {ratio:.3f} times the ordinary least squares estimate. '
-                'A ratio this low indicates that the covariance matrix may be numerically '
-                'singular and that the diffusion coefficient may be unreliable. Consider '
-                'refitting with recondition=True, or inspecting the eigenvalues of '
-                'Diffusion.covariance_matrix.',
-                UserWarning,
-                stacklevel=3,
-            )
-
     @property
     def consistency_ratio(self) -> float:
         """
-        The ratio of the fitted gradient to an ordinary least squares estimate of the same data.
+        The ratio of the median fitted gradient to an ordinary least squares estimate of the same data.
 
-        A value near unity indicates the two estimators agree. A value well below unity indicates
-        that the covariance-weighted fit has been affected by a numerically singular covariance
-        matrix. :py:attr:`None` if the check has not been run.
+        This is for information only: how far the ratio can stray from unity by chance depends on the
+        noise in the data, so the warning raised by the consistency check uses :py:attr:`consistency_z`
+        instead. :py:attr:`None` if the check has not been run or the ordinary least squares gradient is
+        not positive.
 
         :return: The ratio of the two gradient estimates.
         """
         return getattr(self, '_consistency_ratio', None)
+
+    @property
+    def consistency_z(self) -> float:
+        """
+        The difference between the generalised and ordinary least squares gradients of the fitted data,
+        divided by the standard deviation of that difference expected from the covariance matrix.
+
+        If the covariance matrix is correct and a straight line describes the data, this follows a standard
+        normal distribution, so a magnitude above about three indicates that the covariance matrix is
+        unreliable or that the fitted time intervals extend outside the diffusive regime. :py:attr:`nan` if the
+        covariance matrix is too close to singular for the statistic to be computed, and :py:attr:`None`
+        if the check has not been run.
+
+        :return: The consistency statistic.
+        """
+        return getattr(self, '_consistency_z', None)
 
     def _diffusion(self, start_dt: sc.Variable, **kwargs):
         """
@@ -545,7 +535,9 @@ def _check_consistency(
     If the covariance matrix is correct, both estimators are unbiased and the generalised least squares
     estimator has the smaller variance, so the statistic z = (g_GLS - g_OLS) / sqrt(Var_OLS - Var_GLS)
     follows a standard normal distribution whatever the system (a Hausman test). A large value of
-    abs(z) is evidence that the covariance matrix is unreliable rather than that the data are unusual.
+    abs(z) is evidence that the covariance matrix is unreliable, or that a straight line does not describe
+    the data over the fitted time intervals (for example, if these begin before the diffusive regime or an
+    intercept is needed but not fitted), rather than that the data are unusual.
     A generalised least squares variance that is not positive, or not smaller than the ordinary least
     squares variance, cannot arise from a well-conditioned covariance matrix, and shows that the matrix
     is too close to singular for its pseudo-inverse.
@@ -594,8 +586,10 @@ def _check_consistency(
         warnings.warn(
             f'The generalised least squares gradient differs from the ordinary least squares estimate by '
             f'{abs(z):.1f} times the spread expected from the noise in the data (z = {z:.2f}). A difference '
-            'this large indicates that the covariance matrix may be unreliable and that the diffusion '
-            f'coefficient may be wrong. {advice}',
+            'this large indicates that the covariance matrix may be unreliable, or that a straight line does '
+            'not describe the data from start_dt onwards, and that the diffusion coefficient may be wrong. '
+            'Consider a later start_dt, refitting with recondition=True, or inspecting the eigenvalues of '
+            'Diffusion.covariance_matrix.',
             UserWarning,
             stacklevel=3,
         )

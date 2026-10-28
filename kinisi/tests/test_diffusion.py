@@ -23,7 +23,6 @@ from kinisi.diffusion import (
     marchenkopastur,
     minimum_eigenvalue_method,
 )
-from kinisi.samples import Samples
 from kinisi.tests import TEST_FILE_PATH
 
 # Random seed setting not yet implemented into bayesian regression and so cannot almost_equal
@@ -350,10 +349,13 @@ class TestConsistencyCheck(unittest.TestCase):
         )
         return sc.DataGroup({'da': da, 'dimensionality': sc.scalar(3)})
 
-    def _fit(self, **kwargs):
-        diff = Diffusion(self._datagroup(**kwargs))
-        diff.bayesian_regression(sc.scalar(2.0, unit='ps'), progress=False, n_samples=200, n_burn=100)
+    @staticmethod
+    def _regress(diff, **kwargs):
+        diff.bayesian_regression(sc.scalar(2.0, unit='ps'), progress=False, n_samples=200, n_burn=100, **kwargs)
         return diff
+
+    def _fit(self, **kwargs):
+        return self._regress(Diffusion(self._datagroup(**kwargs)))
 
     def test_ratio_is_near_unity_for_a_healthy_fit(self):
         diff = self._fit()
@@ -365,30 +367,36 @@ class TestConsistencyCheck(unittest.TestCase):
             self._fit(seed=1)
         assert not [w for w in caught if 'ordinary least squares' in str(w.message)]
 
-    def test_warning_when_the_gradient_is_suppressed(self):
-        diff = self._fit()
-        diff.gradient = Samples(diff.gradient.values * 0.01, unit=diff.gradient.unit)
+    def test_no_warning_for_a_healthy_fit_without_intercept(self):
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter('always')
-            diff._check_consistency()
-        assert any('ordinary least squares' in str(w.message) for w in caught)
-        assert diff.consistency_ratio < 0.7
+            self._regress(Diffusion(self._datagroup(seed=1)), fit_intercept=False)
+        assert not [w for w in caught if 'ordinary least squares' in str(w.message)]
 
-    def test_threshold_is_respected(self):
+    def test_z_is_reported_for_a_healthy_fit(self):
         diff = self._fit()
+        assert np.isfinite(diff.consistency_z)
+        assert abs(diff.consistency_z) < 3
+
+    def test_z_threshold_is_respected(self):
+        z = self._fit().consistency_z
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter('always')
-            diff._check_consistency(warn_threshold=1.5)
+            self._regress(Diffusion(self._datagroup()), z_threshold=abs(z) / 2)
         assert any('ordinary least squares' in str(w.message) for w in caught)
 
     def test_check_can_be_disabled(self):
-        diff = Diffusion(self._datagroup())
-        diff.bayesian_regression(
-            sc.scalar(2.0, unit='ps'), progress=False, n_samples=200, n_burn=100, check_consistency=False
-        )
+        diff = self._regress(Diffusion(self._datagroup()), check_consistency=False)
         assert diff.consistency_ratio is None
+        assert diff.consistency_z is None
 
-    def test_check_is_safe_before_a_regression(self):
-        diff = Diffusion(self._datagroup())
-        diff._check_consistency()
+    def test_disabling_the_check_clears_earlier_results(self):
+        diff = self._fit()
+        self._regress(diff, check_consistency=False)
         assert diff.consistency_ratio is None
+        assert diff.consistency_z is None
+
+    def test_results_are_none_before_a_regression(self):
+        diff = Diffusion(self._datagroup())
+        assert diff.consistency_ratio is None
+        assert diff.consistency_z is None
