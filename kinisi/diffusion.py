@@ -487,3 +487,43 @@ def _straight_line(abscissa: np.ndarray, gradient: float, intercept: float = 0.0
     :return: The resulting ordinate.
     """
     return gradient * abscissa + intercept
+
+
+def _gradient_estimates(
+    abscissa: np.ndarray, ordinate: np.ndarray, covariance: np.ndarray, fit_intercept: bool = True
+) -> tuple[float, float, float, float]:
+    """
+    Estimate the gradient of a straight line by generalised and by ordinary least squares, together
+    with the variance of each estimate under the given covariance matrix.
+
+    The generalised least squares estimate uses the same pseudo-inverse of the covariance matrix as
+    the likelihood in :py:func:`Diffusion.bayesian_regression`. Where that pseudo-inverse carries no
+    information about the gradient, the generalised least squares gradient is :py:attr:`nan` and its
+    variance is infinite.
+
+    :param abscissa: The abscissa data.
+    :param ordinate: The ordinate data.
+    :param covariance: The covariance matrix of the ordinate data.
+    :param fit_intercept: Whether the straight line has an intercept. Optional, default is :py:attr:`True`.
+
+    :return: The generalised least squares gradient, the ordinary least squares gradient, and the
+        variances of the generalised and ordinary least squares gradients.
+    """
+    if fit_intercept:
+        design = np.column_stack([abscissa, np.ones_like(abscissa)])
+    else:
+        design = abscissa[:, np.newaxis]
+
+    ols_inverse = np.linalg.inv(design.T @ design)
+    ols_gradient = (ols_inverse @ design.T @ ordinate)[0]
+    ols_variance = (ols_inverse @ design.T @ covariance @ design @ ols_inverse)[0, 0]
+
+    weights = pinvh(covariance)
+    try:
+        gls_inverse = np.linalg.inv(design.T @ weights @ design)
+    except np.linalg.LinAlgError:
+        return np.nan, ols_gradient, np.inf, ols_variance
+    gls_gradient = (gls_inverse @ design.T @ weights @ ordinate)[0]
+    gls_variance = gls_inverse[0, 0]
+
+    return gls_gradient, ols_gradient, gls_variance, ols_variance

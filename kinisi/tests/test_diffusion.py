@@ -12,8 +12,16 @@ import warnings
 import numpy as np
 import pytest
 import scipp as sc
+from scipy.stats import linregress
 
-from kinisi.diffusion import Diffusion, _straight_line, eigenvalue_clipping, marchenkopastur, minimum_eigenvalue_method
+from kinisi.diffusion import (
+    Diffusion,
+    _gradient_estimates,
+    _straight_line,
+    eigenvalue_clipping,
+    marchenkopastur,
+    minimum_eigenvalue_method,
+)
 from kinisi.samples import Samples
 from kinisi.tests import TEST_FILE_PATH
 
@@ -174,6 +182,73 @@ class TestDiffusion(unittest.TestCase):
 
         with pytest.raises(ValueError, match='Units of the covariance matrix and mu do not align correctly'):
             diff_exc.posterior_predictive(n_posterior_samples=1, n_predictive_samples=400)
+
+
+def _msd_like_covariance(dt):
+    """
+    A covariance matrix shaped like that of a mean-squared displacement: the variances grow with the
+    time interval and neighbouring time intervals are strongly positively correlated.
+    """
+    return 0.01 * np.minimum.outer(dt, dt) ** 2
+
+
+class TestGradientEstimates(unittest.TestCase):
+    """
+    Testing the generalised and ordinary least squares gradient estimates.
+    """
+
+    dt = np.arange(2, 12, dtype=float)
+
+    def test_both_gradients_recover_a_straight_line(self):
+        gls_gradient, ols_gradient, _, _ = _gradient_estimates(self.dt, 6 * self.dt + 2, _msd_like_covariance(self.dt))
+        assert np.isclose(gls_gradient, 6)
+        assert np.isclose(ols_gradient, 6)
+
+    def test_both_gradients_recover_a_line_through_the_origin(self):
+        gls_gradient, ols_gradient, _, _ = _gradient_estimates(
+            self.dt, 6 * self.dt, _msd_like_covariance(self.dt), fit_intercept=False
+        )
+        assert np.isclose(gls_gradient, 6)
+        assert np.isclose(ols_gradient, 6)
+
+    def test_ols_gradient_matches_linregress(self):
+        y = 6 * self.dt + np.random.RandomState(0).normal(0, 1, self.dt.size)
+        _, ols_gradient, _, _ = _gradient_estimates(self.dt, y, _msd_like_covariance(self.dt))
+        assert np.isclose(ols_gradient, linregress(self.dt, y).slope)
+
+    def test_estimators_coincide_for_uncorrelated_equal_variances(self):
+        y = 6 * self.dt + np.random.RandomState(0).normal(0, 1, self.dt.size)
+        gls_gradient, ols_gradient, gls_variance, ols_variance = _gradient_estimates(
+            self.dt, y, 4.0 * np.eye(self.dt.size)
+        )
+        expected_variance = 4.0 / np.sum((self.dt - self.dt.mean()) ** 2)
+        assert np.isclose(gls_gradient, ols_gradient)
+        assert np.isclose(gls_variance, expected_variance)
+        assert np.isclose(ols_variance, expected_variance)
+
+    def test_gls_variance_is_smaller_for_a_well_conditioned_covariance(self):
+        _, _, gls_variance, ols_variance = _gradient_estimates(self.dt, 6 * self.dt, _msd_like_covariance(self.dt))
+        assert 0 < gls_variance < ols_variance
+
+    def test_gls_variance_is_not_smaller_for_a_near_singular_covariance(self):
+        # Collapse the covariance along a direction that overlaps the time intervals, so that the
+        # pseudo-inverse discards information the ordinary least squares estimate still uses.
+        centred = self.dt - self.dt.mean()
+        alternating = (-1.0) ** np.arange(self.dt.size)
+        direction = centred / np.linalg.norm(centred) + alternating / np.linalg.norm(alternating)
+        direction -= direction.mean()
+        direction /= np.linalg.norm(direction)
+        projection = np.eye(self.dt.size) - np.outer(direction, direction)
+        covariance = projection @ _msd_like_covariance(self.dt) @ projection
+        _, _, gls_variance, ols_variance = _gradient_estimates(self.dt, 6 * self.dt, covariance)
+        assert ols_variance - gls_variance <= 0
+
+    def test_gls_variance_is_infinite_when_the_covariance_carries_no_information(self):
+        gls_gradient, _, gls_variance, _ = _gradient_estimates(
+            self.dt, 6 * self.dt, np.zeros((self.dt.size, self.dt.size))
+        )
+        assert np.isnan(gls_gradient)
+        assert np.isinf(gls_variance)
 
 
 class TestConsistencyCheck(unittest.TestCase):
