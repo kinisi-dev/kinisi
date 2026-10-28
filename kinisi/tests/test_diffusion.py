@@ -70,10 +70,12 @@ class TestDiffusion(unittest.TestCase):
         cls.msd_load = sc.io.load_hdf5(filename=TEST_FILE_PATH / 'example_msd2.hdf5')['_dg']
         cls.RNG = np.random.RandomState(42)
         cls.diff = Diffusion(dg=cls.msd_load)
+        # The mean-squared displacement in this file is curved up to about 1 ps, so fits that start earlier
+        # are flagged by the consistency check.
+        cls.start_dt = 2000 * sc.Unit('femtosecond')
 
     def test_bayesian_regression(self):
-        start_dt = 10 * sc.Unit('femtosecond')
-        self.diff.bayesian_regression(start_dt=start_dt, random_state=self.RNG)
+        self.diff.bayesian_regression(start_dt=self.start_dt, random_state=self.RNG)
 
         assert self.diff.gradient is not None
         assert hasattr(self.diff.gradient, 'mean')
@@ -86,7 +88,7 @@ class TestDiffusion(unittest.TestCase):
 
         cov = self.diff.covariance_matrix
         assert cov.dims == ('time_interval1', 'time_interval2')
-        assert cov.shape == (140, 140)
+        assert cov.shape == (121, 121)
 
     def test_start_dt_beyond_data(self):
         diff = Diffusion(dg=self.msd_load)
@@ -94,9 +96,17 @@ class TestDiffusion(unittest.TestCase):
         with pytest.raises(ValueError, match='later than the longest time interval'):
             diff.bayesian_regression(start_dt=1e9 * sc.Unit('femtosecond'))
 
+    def test_warning_for_a_fit_that_starts_too_early(self):
+        diff = Diffusion(dg=self.msd_load)
+        with pytest.warns(UserWarning, match='differs from the ordinary least squares'):
+            diff.bayesian_regression(start_dt=10 * sc.Unit('femtosecond'), n_samples=100, n_burn=50, progress=False)
+        assert diff.consistency_z > 3
+
     def test_bayesian_regression_without_intercept(self):
         diff = Diffusion(dg=self.msd_load)
-        diff.bayesian_regression(start_dt=10 * sc.Unit('femtosecond'), fit_intercept=False, n_samples=100, n_burn=50)
+        # The data have a non-zero intercept, so a line through the origin is flagged.
+        with pytest.warns(UserWarning, match='differs from the ordinary least squares'):
+            diff.bayesian_regression(start_dt=self.start_dt, fit_intercept=False, n_samples=100, n_burn=50)
 
         assert diff.intercept is None
         assert diff._flatchain.shape[1] == 1
@@ -104,15 +114,13 @@ class TestDiffusion(unittest.TestCase):
         assert ppd.sizes['samples'] == 6
 
     def test__diffusion(self):
-        start_dt = 400 * sc.Unit('femtosecond')
-        self.diff._diffusion(start_dt)
+        self.diff._diffusion(self.start_dt)
 
         assert self.diff._diffusion_coefficient.to_unit('cm2/s').unit == sc.Unit('cm2/s')
         assert self.diff.D.to_unit('cm2/s').unit == sc.Unit('cm2/s')
 
     def test__jump_diffusion(self):
-        start_dt = 200 * sc.Unit('femtosecond')
-        self.diff._jump_diffusion(start_dt)
+        self.diff._jump_diffusion(self.start_dt)
 
         assert self.diff._jump_diffusion_coefficient.to_unit('cm2/s').unit == sc.Unit('cm2/s')
         assert self.diff.D_J.to_unit('cm2/s').unit == sc.Unit('cm2/s')
@@ -121,25 +129,23 @@ class TestDiffusion(unittest.TestCase):
         msd_load = sc.io.load_hdf5(filename=TEST_FILE_PATH / 'example_msd2.hdf5')['_dg']
         diff_cond = Diffusion(dg=msd_load)
         diff_cond.dg['da'] = diff_cond.dg['da'] * sc.scalar(1.0, unit=sc.Unit('coulomb2'))
-        start_dt = 300 * sc.Unit('femtosecond')
         temp = 320 * sc.Unit('kelvin')
         volume = 300 * sc.Unit('angstrom3')
 
-        diff_cond._conductivity(start_dt=start_dt, temperature=temp, volume=volume, number_of_particles=50)
+        diff_cond._conductivity(start_dt=self.start_dt, temperature=temp, volume=volume, number_of_particles=50)
 
         assert diff_cond._sigma.to_unit('S/m').unit == 'S/m'
         assert diff_cond.sigma.to_unit('S/m').unit == 'S/m'
 
     def test_start_dt_unit_conversion(self):
         diff = Diffusion(dg=self.msd_load)
-        diff._jump_diffusion(0.2 * sc.Unit('ps'), n_samples=100, n_burn=50, progress=False)
+        diff._jump_diffusion(2 * sc.Unit('ps'), n_samples=100, n_burn=50, progress=False)
         assert diff._start_dt.unit == self.msd_load['da'].coords['time interval'].unit
-        expected = np.argwhere(self.msd_load['da'].coords['time interval'] >= 200 * sc.Unit('fs'))[0][0]
+        expected = np.argwhere(self.msd_load['da'].coords['time interval'] >= 2000 * sc.Unit('fs'))[0][0]
         assert diff.diff_regime == expected
 
     def test_compute_covariance_matrix(self):
-        start_dt = 200 * sc.Unit('femtosecond')
-        self.diff.bayesian_regression(start_dt=start_dt)
+        self.diff.bayesian_regression(start_dt=self.start_dt)
 
         cov = self.diff.compute_covariance_matrix()
 
@@ -176,8 +182,7 @@ class TestDiffusion(unittest.TestCase):
 
     def test_posterior_predictive_error(self):
         diff_exc = Diffusion(dg=self.msd_load)
-        start_dt = 400 * sc.Unit('femtosecond')
-        diff_exc._diffusion(start_dt)
+        diff_exc._diffusion(self.start_dt)
         diff_exc._covariance_matrix = diff_exc._covariance_matrix * sc.scalar(1.0, unit=sc.Unit('angstrom6'))
 
         with pytest.raises(ValueError, match='Units of the covariance matrix and mu do not align correctly'):
