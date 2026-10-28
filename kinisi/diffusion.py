@@ -527,3 +527,77 @@ def _gradient_estimates(
     gls_variance = gls_inverse[0, 0]
 
     return gls_gradient, ols_gradient, gls_variance, ols_variance
+
+
+def _check_consistency(
+    gls_gradient: float, ols_gradient: float, gls_variance: float, ols_variance: float, z_threshold: float = 3.0
+) -> float:
+    """
+    Compare the generalised least squares gradient with the ordinary least squares gradient of the same
+    data, and warn if they disagree by more than the noise in the data allows.
+
+    The generalised least squares fit performed by :py:func:`Diffusion.bayesian_regression` weights the
+    observations by the inverse of an estimated covariance matrix. Where sampling noise has made that
+    matrix numerically singular, the inversion can return a gradient in error by several orders of
+    magnitude, in either direction, without any other indication of failure. An ordinary least squares
+    fit to the same observations does not invert the covariance and so cannot be affected in the same way.
+
+    If the covariance matrix is correct, both estimators are unbiased and the generalised least squares
+    estimator has the smaller variance, so the statistic z = (g_GLS - g_OLS) / sqrt(Var_OLS - Var_GLS)
+    follows a standard normal distribution whatever the system (a Hausman test). A large value of
+    abs(z) is evidence that the covariance matrix is unreliable rather than that the data are unusual.
+    A generalised least squares variance that is not positive, or not smaller than the ordinary least
+    squares variance, cannot arise from a well-conditioned covariance matrix, and shows that the matrix
+    is too close to singular for its pseudo-inverse.
+
+    :param gls_gradient: The generalised least squares gradient.
+    :param ols_gradient: The ordinary least squares gradient.
+    :param gls_variance: The variance of the generalised least squares gradient.
+    :param ols_variance: The variance of the ordinary least squares gradient.
+    :param z_threshold: The magnitude of z above which a warning is raised. Optional, default
+        is :py:attr:`3.0`.
+
+    :return: The statistic z, or :py:attr:`nan` if the covariance matrix is too close to singular.
+    """
+    advice = 'Consider refitting with recondition=True, or inspecting the eigenvalues of Diffusion.covariance_matrix.'
+
+    if ols_gradient <= 0:
+        warnings.warn(
+            f'The ordinary least squares gradient is {ols_gradient:.3e}, which is not positive. The data '
+            'show no increase over the fitted time intervals, and the diffusion coefficient may be '
+            'unreliable. Consider whether start_dt lies within the diffusive regime.',
+            UserWarning,
+            stacklevel=3,
+        )
+
+    if not gls_variance > 0 or not ols_variance - gls_variance > 0:
+        warnings.warn(
+            'The generalised least squares gradient does not have a smaller variance than the ordinary '
+            'least squares gradient, which is impossible for a well-conditioned covariance matrix. The '
+            'covariance matrix is too close to singular for its pseudo-inverse to be reliable, and the '
+            f'diffusion coefficient may be unreliable. {advice}',
+            UserWarning,
+            stacklevel=3,
+        )
+        return np.nan
+
+    z = (gls_gradient - ols_gradient) / np.sqrt(ols_variance - gls_variance)
+
+    if not np.isfinite(z):
+        warnings.warn(
+            'The comparison of the generalised and ordinary least squares gradients is not finite, so the '
+            f'consistency of the fit could not be checked. {advice}',
+            UserWarning,
+            stacklevel=3,
+        )
+    elif abs(z) > z_threshold:
+        warnings.warn(
+            f'The generalised least squares gradient differs from the ordinary least squares estimate by '
+            f'{abs(z):.1f} times the spread expected from the noise in the data (z = {z:.2f}). A difference '
+            'this large indicates that the covariance matrix may be unreliable and that the diffusion '
+            f'coefficient may be wrong. {advice}',
+            UserWarning,
+            stacklevel=3,
+        )
+
+    return z

@@ -16,6 +16,7 @@ from scipy.stats import linregress
 
 from kinisi.diffusion import (
     Diffusion,
+    _check_consistency,
     _gradient_estimates,
     _straight_line,
     eigenvalue_clipping,
@@ -249,6 +250,79 @@ class TestGradientEstimates(unittest.TestCase):
         )
         assert np.isnan(gls_gradient)
         assert np.isinf(gls_variance)
+
+
+def _consistency_warnings(*args, **kwargs):
+    """
+    Run the consistency check and return its value and the messages of the warnings it raised.
+    """
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always')
+        z = _check_consistency(*args, **kwargs)
+    return z, [str(w.message) for w in caught]
+
+
+class TestCheckConsistency(unittest.TestCase):
+    """
+    Testing the decision of whether the generalised and ordinary least squares gradients agree.
+
+    The variances are chosen so that the standard deviation of the difference between the two
+    gradients is one, so the statistic is the difference itself.
+    """
+
+    def test_no_warning_when_the_gradients_agree(self):
+        z, messages = _consistency_warnings(6.5, 6.0, 1.0, 2.0)
+        assert np.isclose(z, 0.5)
+        assert not messages
+
+    def test_warning_when_the_gradient_is_inflated(self):
+        z, messages = _consistency_warnings(10.0, 6.0, 1.0, 2.0)
+        assert np.isclose(z, 4.0)
+        assert any('ordinary least squares' in m for m in messages)
+
+    def test_warning_when_the_gradient_is_suppressed(self):
+        z, messages = _consistency_warnings(2.0, 6.0, 1.0, 2.0)
+        assert np.isclose(z, -4.0)
+        assert any('ordinary least squares' in m for m in messages)
+
+    def test_threshold_is_respected(self):
+        _, messages = _consistency_warnings(7.0, 6.0, 1.0, 2.0)
+        assert not messages
+        _, messages = _consistency_warnings(7.0, 6.0, 1.0, 2.0, z_threshold=0.5)
+        assert any('ordinary least squares' in m for m in messages)
+
+    def test_warning_when_the_ols_gradient_is_negative(self):
+        _, messages = _consistency_warnings(-1.0, -1.0, 1.0, 2.0)
+        assert any('not positive' in m for m in messages)
+
+    def test_warning_when_the_ols_gradient_is_zero(self):
+        _, messages = _consistency_warnings(0.0, 0.0, 1.0, 2.0)
+        assert any('not positive' in m for m in messages)
+
+    def test_warning_when_the_ols_variance_is_not_larger(self):
+        z, messages = _consistency_warnings(6.0, 6.0, 2.0, 1.0)
+        assert np.isnan(z)
+        assert any('singular' in m for m in messages)
+
+    def test_warning_when_the_variances_are_equal(self):
+        z, messages = _consistency_warnings(6.0, 6.0, 1.0, 1.0)
+        assert np.isnan(z)
+        assert any('singular' in m for m in messages)
+
+    def test_warning_when_the_gls_variance_is_not_positive(self):
+        z, messages = _consistency_warnings(6.0, 6.0, -5e13, 2.0)
+        assert np.isnan(z)
+        assert any('singular' in m for m in messages)
+
+    def test_warning_when_the_gls_variance_is_infinite(self):
+        z, messages = _consistency_warnings(np.nan, 6.0, np.inf, 2.0)
+        assert np.isnan(z)
+        assert any('singular' in m for m in messages)
+
+    def test_warning_when_the_statistic_is_not_finite(self):
+        z, messages = _consistency_warnings(np.nan, 6.0, 1.0, 2.0)
+        assert np.isnan(z)
+        assert any('not finite' in m for m in messages)
 
 
 class TestConsistencyCheck(unittest.TestCase):
