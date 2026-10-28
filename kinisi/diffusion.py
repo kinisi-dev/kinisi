@@ -549,29 +549,32 @@ def _check_consistency(
     gls_gradient: float, ols_gradient: float, gls_variance: float, ols_variance: float, z_threshold: float = 3.0
 ) -> float:
     """
-    Compare the generalised least squares gradient with the ordinary least squares gradient of the same
-    data, and warn if they disagree by more than the noise in the data allows.
+    Check that the generalised least squares gradient agrees with the ordinary least squares gradient of
+    the same data, to within the noise expected from the covariance matrix, and warn if it does not.
 
-    The generalised least squares fit performed by :py:func:`Diffusion.bayesian_regression` weights the
-    observations by the inverse of an estimated covariance matrix. Where sampling noise has made that
-    matrix numerically singular, the inversion can return a gradient in error by several orders of
-    magnitude, in either direction, without any other indication of failure. An ordinary least squares
-    fit to the same observations does not invert the covariance and so cannot be affected in the same way.
+    The check computes the statistic z = (g_GLS - g_OLS) / sqrt(Var_OLS - Var_GLS), where g_GLS and g_OLS
+    are the two gradients and Var_GLS and Var_OLS are their sampling variances, both evaluated with the
+    estimated covariance matrix C used in the fit (see :py:func:`_gradient_estimates`).
 
-    If the covariance matrix is correct, both estimators are unbiased and the generalised least squares
-    estimator has the smaller variance, so the statistic z = (g_GLS - g_OLS) / sqrt(Var_OLS - Var_GLS)
-    follows approximately a standard normal distribution (a Hausman test). This is exact only for normally
-    distributed data with a known covariance matrix that the pseudo-inverse inverts exactly; a covariance
-    matrix estimated from the same data widens the distribution somewhat. A large value of abs(z) is
-    evidence that the covariance matrix is unreliable, or that a straight line does not describe the data
+    For a design matrix X, Var_GLS = [(X^T C^+ X)^-1]_00, where C^+ is the pseudo-inverse of C, and
+    Var_OLS = [(X^T X)^-1 X^T C X (X^T X)^-1]_00. Var_OLS is the variance of the OLS gradient for data
+    correlated as described by C. It is not the textbook OLS standard error sigma^2 (X^T X)^-1, which
+    assumes uncorrelated data and is far too small for mean-squared displacements.
+
+    The check is needed because the generalised least squares fit performed by
+    :py:func:`Diffusion.bayesian_regression` weights the observations by the inverse of C. Where sampling
+    noise has made C numerically singular, the inversion can return a gradient in error by several orders of
+    magnitude, in either direction, without any other indication of failure. An ordinary least squares fit
+    does not invert C and so cannot fail in the same way.
+
+    If C is correct, both gradients are unbiased and the generalised least squares gradient has a sampling
+    variance no larger than that of the ordinary least squares gradient. The variance of their difference is
+    then Var_OLS - Var_GLS, so z follows approximately a standard normal distribution (a Hausman test). This
+    is exact only for normally distributed data with a known covariance matrix that the pseudo-inverse
+    inverts exactly; estimating C from the same data widens the distribution somewhat. A large value of
+    abs(z) is therefore evidence that C is unreliable, or that a straight line does not describe the data
     over the fitted time intervals (for example, if these begin before the diffusive regime or an intercept
     is needed but not fitted), rather than that the data are unusual.
-
-    A generalised least squares variance that is not positive, or larger than the ordinary least squares
-    variance, cannot arise from an exact inverse of the covariance matrix, and shows that the matrix is too
-    close to singular for its pseudo-inverse. If the two variances are equal, to within rounding, the two
-    estimators coincide (for example, for a straight line through two points), so they cannot disagree and
-    z is taken as zero.
 
     :param gls_gradient: The generalised least squares gradient.
     :param ols_gradient: The ordinary least squares gradient.
@@ -580,8 +583,14 @@ def _check_consistency(
     :param z_threshold: The magnitude of z above which a warning is raised. Optional, default
         is :py:attr:`3.0`.
 
-    :return: The statistic z, or :py:attr:`nan` if the covariance matrix is too close to singular or a
+    :return: The statistic z. This is zero if the two variances are equal to within rounding, when the two
+        estimators coincide (for example, for a straight line through two points) and so cannot disagree,
+        :py:attr:`nan` if C is too close to singular for its pseudo-inverse, and not finite if either
         gradient is not finite.
+
+    :warns UserWarning: If abs(z) is larger than :py:attr:`z_threshold`; if Var_GLS is not positive or is
+        larger than Var_OLS by more than rounding, neither of which can arise from an exact inverse of C, so
+        that C is too close to singular for its pseudo-inverse; or if either gradient is not finite.
     """
     advice = 'Consider refitting with recondition=True, or inspecting the eigenvalues of Diffusion.covariance_matrix.'
 
