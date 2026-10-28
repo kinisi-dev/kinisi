@@ -226,6 +226,36 @@ class TestGradientEstimates(unittest.TestCase):
         assert np.isclose(gls_variance, expected_variance)
         assert np.isclose(ols_variance, expected_variance)
 
+    def test_estimators_coincide_for_uncorrelated_equal_variances_without_intercept(self):
+        y = 6 * self.dt + np.random.RandomState(0).normal(0, 1, self.dt.size)
+        gls_gradient, ols_gradient, gls_variance, ols_variance = _gradient_estimates(
+            self.dt, y, 4.0 * np.eye(self.dt.size), fit_intercept=False
+        )
+        expected_variance = 4.0 / np.sum(self.dt**2)
+        assert np.isclose(gls_gradient, ols_gradient)
+        assert np.isclose(gls_variance, expected_variance)
+        assert np.isclose(ols_variance, expected_variance)
+
+    def test_coinciding_estimators_pass_the_check(self):
+        y = 6 * self.dt + np.random.RandomState(0).normal(0, 1, self.dt.size)
+        z, messages = _consistency_warnings(*_gradient_estimates(self.dt, y, 4.0 * np.eye(self.dt.size)))
+        assert z == 0
+        assert not messages
+
+    def test_z_is_standard_normal_for_the_true_covariance(self):
+        covariance = _msd_like_covariance(self.dt)
+        cholesky = np.linalg.cholesky(covariance)
+        for fit_intercept in [True, False]:
+            with self.subTest(fit_intercept=fit_intercept):
+                rng = np.random.RandomState(0)
+                z = []
+                for _ in range(4000):
+                    y = 6 * self.dt + 2 * fit_intercept + cholesky @ rng.normal(size=self.dt.size)
+                    estimates = _gradient_estimates(self.dt, y, covariance, fit_intercept)
+                    z.append(_check_consistency(*estimates, z_threshold=np.inf))
+                assert abs(np.mean(z)) < 0.07
+                assert 0.93 < np.std(z) < 1.07
+
     def test_gls_variance_is_smaller_for_a_well_conditioned_covariance(self):
         _, _, gls_variance, ols_variance = _gradient_estimates(self.dt, 6 * self.dt, _msd_like_covariance(self.dt))
         assert 0 < gls_variance < ols_variance
@@ -240,8 +270,13 @@ class TestGradientEstimates(unittest.TestCase):
         direction /= np.linalg.norm(direction)
         projection = np.eye(self.dt.size) - np.outer(direction, direction)
         covariance = projection @ _msd_like_covariance(self.dt) @ projection
-        _, _, gls_variance, ols_variance = _gradient_estimates(self.dt, 6 * self.dt, covariance)
-        assert ols_variance - gls_variance <= 0
+        estimates = _gradient_estimates(self.dt, 6 * self.dt, covariance)
+        _, _, gls_variance, ols_variance = estimates
+        assert 0 < gls_variance < np.inf
+        assert ols_variance < gls_variance
+        z, messages = _consistency_warnings(*estimates)
+        assert np.isnan(z)
+        assert any('singular' in m for m in messages)
 
     def test_gls_variance_is_infinite_when_the_covariance_carries_no_information(self):
         gls_gradient, _, gls_variance, _ = _gradient_estimates(
@@ -290,23 +325,26 @@ class TestCheckConsistency(unittest.TestCase):
         _, messages = _consistency_warnings(7.0, 6.0, 1.0, 2.0, z_threshold=0.5)
         assert any('ordinary least squares' in m for m in messages)
 
-    def test_warning_when_the_ols_gradient_is_negative(self):
-        _, messages = _consistency_warnings(-1.0, -1.0, 1.0, 2.0)
-        assert any('not positive' in m for m in messages)
+    def test_no_warning_for_a_negative_gradient(self):
+        # Whether the data increase is checked by the regression, not here.
+        z, messages = _consistency_warnings(-1.0, -1.0, 1.0, 2.0)
+        assert z == 0
+        assert not messages
 
-    def test_warning_when_the_ols_gradient_is_zero(self):
-        _, messages = _consistency_warnings(0.0, 0.0, 1.0, 2.0)
-        assert any('not positive' in m for m in messages)
-
-    def test_warning_when_the_ols_variance_is_not_larger(self):
+    def test_warning_when_the_ols_variance_is_smaller(self):
         z, messages = _consistency_warnings(6.0, 6.0, 2.0, 1.0)
         assert np.isnan(z)
         assert any('singular' in m for m in messages)
 
-    def test_warning_when_the_variances_are_equal(self):
+    def test_no_warning_when_the_variances_are_equal(self):
         z, messages = _consistency_warnings(6.0, 6.0, 1.0, 1.0)
-        assert np.isnan(z)
-        assert any('singular' in m for m in messages)
+        assert z == 0
+        assert not messages
+
+    def test_no_warning_when_the_variances_differ_by_rounding(self):
+        z, messages = _consistency_warnings(6.0, 6.0, 1.0, 1.0 - 1e-12)
+        assert z == 0
+        assert not messages
 
     def test_warning_when_the_gls_variance_is_not_positive(self):
         z, messages = _consistency_warnings(6.0, 6.0, -5e13, 2.0)
@@ -330,16 +368,17 @@ class TestConsistencyCheck(unittest.TestCase):
     """
 
     @staticmethod
-    def _datagroup(gradient=6.0, n_points=64, seed=0):
+    def _datagroup(gradient=6.0, intercept=0.0, n_points=64, seed=0, noise=0.05):
         """
         A DataGroup with a straight-line mean-squared displacement and a
-        realistic number of independent samples at each lag time.
+        realistic number of independent samples at each lag time. The noise
+        added is the given fraction of the stated standard deviation.
         """
         rng = np.random.RandomState(seed)
         dt = np.arange(2, 2 + n_points, dtype=float)
         n_samples = 4096.0 / dt
         variances = 24.0 * dt**2 / n_samples
-        values = gradient * dt + rng.normal(0, np.sqrt(variances) * 0.05)
+        values = gradient * dt + intercept + rng.normal(0, np.sqrt(variances) * noise)
         da = sc.DataArray(
             sc.array(dims=['time interval'], values=values, variances=variances, unit='angstrom**2'),
             coords={
@@ -350,40 +389,88 @@ class TestConsistencyCheck(unittest.TestCase):
         return sc.DataGroup({'da': da, 'dimensionality': sc.scalar(3)})
 
     @staticmethod
-    def _regress(diff, **kwargs):
-        diff.bayesian_regression(sc.scalar(2.0, unit='ps'), progress=False, n_samples=200, n_burn=100, **kwargs)
+    def _regress(diff, start_dt=2.0, **kwargs):
+        diff.bayesian_regression(sc.scalar(start_dt, unit='ps'), progress=False, n_samples=200, n_burn=100, **kwargs)
         return diff
 
     def _fit(self, **kwargs):
         return self._regress(Diffusion(self._datagroup(**kwargs)))
+
+    def _messages(self, diff, **kwargs):
+        """
+        Run the regression and return the messages of the warnings it raised.
+        """
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter('always')
+            self._regress(diff, **kwargs)
+        return [str(w.message) for w in caught]
+
+    @staticmethod
+    def _overconfident(diff, factor=1e-3):
+        """
+        Make the covariance matrix used by the regression too small by the given factor.
+        """
+        compute_covariance_matrix = diff.compute_covariance_matrix
+        diff.compute_covariance_matrix = lambda: compute_covariance_matrix() * factor
+        return diff
 
     def test_ratio_is_near_unity_for_a_healthy_fit(self):
         diff = self._fit()
         assert 0.8 < diff.consistency_ratio < 1.25
 
     def test_no_warning_for_a_healthy_fit(self):
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter('always')
-            self._fit(seed=1)
-        assert not [w for w in caught if 'ordinary least squares' in str(w.message)]
+        messages = self._messages(Diffusion(self._datagroup(seed=1, noise=1.0)))
+        assert not [m for m in messages if 'ordinary least squares' in m]
 
     def test_no_warning_for_a_healthy_fit_without_intercept(self):
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter('always')
-            self._regress(Diffusion(self._datagroup(seed=1)), fit_intercept=False)
-        assert not [w for w in caught if 'ordinary least squares' in str(w.message)]
+        messages = self._messages(Diffusion(self._datagroup(seed=1, noise=1.0)), fit_intercept=False)
+        assert not [m for m in messages if 'ordinary least squares' in m]
 
     def test_z_is_reported_for_a_healthy_fit(self):
-        diff = self._fit()
+        diff = self._fit(noise=1.0)
         assert np.isfinite(diff.consistency_z)
         assert abs(diff.consistency_z) < 3
 
+    def test_warning_for_an_overconfident_covariance(self):
+        diff = self._overconfident(Diffusion(self._datagroup(noise=1.0)))
+        messages = self._messages(diff)
+        assert abs(diff.consistency_z) > 3
+        assert any('differs from the ordinary least squares' in m for m in messages)
+
     def test_z_threshold_is_respected(self):
-        z = self._fit().consistency_z
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter('always')
-            self._regress(Diffusion(self._datagroup()), z_threshold=abs(z) / 2)
-        assert any('ordinary least squares' in str(w.message) for w in caught)
+        diff = self._overconfident(Diffusion(self._datagroup(noise=1.0)))
+        assert any('differs from the ordinary least squares' in m for m in self._messages(diff))
+        messages = self._messages(diff, z_threshold=abs(diff.consistency_z) + 1)
+        assert not [m for m in messages if 'differs from the ordinary least squares' in m]
+
+    def test_warning_when_the_data_do_not_increase(self):
+        diff = Diffusion(self._datagroup(gradient=-0.5))
+        messages = self._messages(diff)
+        assert any('not positive' in m for m in messages)
+        assert np.isfinite(diff.consistency_z)
+        assert diff.consistency_ratio is None
+
+    def test_warning_when_the_data_do_not_increase_without_intercept(self):
+        # A line through the origin has a positive gradient for these data, although they fall.
+        diff = Diffusion(self._datagroup(gradient=-0.5, intercept=50.0))
+        messages = self._messages(diff, fit_intercept=False)
+        assert any('not positive' in m for m in messages)
+
+    def test_estimators_coincide_for_two_time_intervals(self):
+        diff = Diffusion(self._datagroup())
+        messages = self._messages(diff, start_dt=64.0)
+        assert diff.consistency_z == 0
+        assert not [m for m in messages if 'singular' in m]
+
+    def test_one_time_interval_is_too_few(self):
+        with pytest.raises(ValueError, match='only one time interval'):
+            self._regress(Diffusion(self._datagroup()), start_dt=65.0)
+
+    def test_non_finite_data_are_rejected(self):
+        dg = self._datagroup()
+        dg['da'].values[10] = np.nan
+        with pytest.raises(ValueError, match='not all finite'):
+            self._regress(Diffusion(dg))
 
     def test_check_can_be_disabled(self):
         diff = self._regress(Diffusion(self._datagroup()), check_consistency=False)
