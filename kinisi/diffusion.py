@@ -98,7 +98,7 @@ class Diffusion:
         cond_max: float = 1e16,
         recondition: bool = False,
         check_consistency: bool = True,
-        warn_threshold: float = 0.7,
+        z_threshold: float = 3.0,
         fit_intercept: bool = True,
         n_samples: int = 1000,
         n_walkers: int = 32,
@@ -113,8 +113,8 @@ class Diffusion:
         :param start_dt: The time at which the diffusion regime begins.
         :param cond_max: The maximum condition number of the covariance matrix. Optional, default is :py:attr:`1e16`.
         :param recondition: Whether to recondition the covariance matrix. Optional, default is :py:attr:`False`.
-        :param check_consistency: Whether to compare the fitted gradient against an ordinary least squares estimate and warn if they disagree. Optional, default is :py:attr:`True`.
-        :param warn_threshold: The ratio below which a warning is raised. Optional, default is :py:attr:`0.7`.
+        :param check_consistency: Whether to compare the generalised least squares gradient against an ordinary least squares estimate and warn if they disagree by more than the noise in the data allows, if the covariance matrix is too close to singular for the comparison, or if the data show no increase. Optional, default is :py:attr:`True`.
+        :param z_threshold: The magnitude of the consistency statistic, :py:attr:`consistency_z`, above which a warning is raised. Optional, default is :py:attr:`3.0`.
         :param fit_intercept: Whether to fit an intercept. Optional, default is :py:attr:`True`.
         :param n_samples: The number of MCMC samples to take. Optional, default is :py:attr:`1000`.
         :param n_walkers: The number of walkers to use in the MCMC. Optional, default is :py:attr:`32`.
@@ -122,6 +122,9 @@ class Diffusion:
         :param n_thin: The thinning factor for the MCMC samples. Optional, default is :py:attr:`10`.
         :param progress: Whether to show the progress bar. Optional, default is :py:attr:`True`.
         :param random_state: The random state to use for the MCMC. Optional, default is :py:attr:`None`.
+
+        :raises ValueError: If :py:attr:`start_dt` leaves fewer than two time intervals, or the mean-squared
+            displacements from :py:attr:`start_dt` onwards are not all finite.
         """
         if random_state is not None:
             np.random.seed(random_state.get_state()[1][1])
@@ -129,12 +132,21 @@ class Diffusion:
         self._start_dt = sc.to_unit(start_dt, self.dg['da'].coords['time interval'].unit)
         self._cond_max = cond_max
         self._recondition = recondition
+        self._consistency_ratio = None
+        self._consistency_z = None
 
         self.diff_regime = self._diff_regime_index()
         self._covariance_matrix = self.compute_covariance_matrix()
 
         x_values = self.dg['da'].coords['time interval'][self.diff_regime :].values
         y_values = self.dg['da']['time interval', self.diff_regime :].values
+        if x_values.size < 2:
+            raise ValueError(
+                f'start_dt ({self._start_dt.value} {self._start_dt.unit}) leaves only one time interval, but at '
+                'least two are needed for the fit.'
+            )
+        if not np.all(np.isfinite(y_values)):
+            raise ValueError('The mean-squared displacements from start_dt onwards are not all finite.')
 
         _, logdet = np.linalg.slogdet(self._covariance_matrix.values)
         logdet += np.log(2 * np.pi) * y_values.size
@@ -155,6 +167,23 @@ class Diffusion:
 
         ols = linregress(x_values, y_values)
         self._ols_gradient = ols.slope
+
+        if check_consistency:
+            if not ols.slope > 0:
+                warnings.warn(
+                    f'The ordinary least squares gradient is {ols.slope:.3e}, which is not positive. The data '
+                    'show no increase over the fitted time intervals, and the diffusion coefficient may be '
+                    'unreliable. Consider whether start_dt lies within the diffusive regime.',
+                    UserWarning,
+                    stacklevel=2,
+                )
+            gls_gradient, ols_gradient, gls_variance, ols_variance = _gradient_estimates(
+                x_values, y_values, self._covariance_matrix.values, fit_intercept
+            )
+            self._consistency_z = _check_consistency(
+                gls_gradient, ols_gradient, gls_variance, ols_variance, z_threshold
+            )
+
         slope = ols.slope
         intercept = 1e-20
         if slope < 0:
@@ -182,8 +211,8 @@ class Diffusion:
         else:
             self.intercept = None
 
-        if check_consistency:
-            self._check_consistency(warn_threshold)
+        if check_consistency and ols_gradient > 0:
+            self._consistency_ratio = np.median(self.gradient.values) / ols_gradient
 
     def _diff_regime_index(self) -> int:
         """
@@ -202,52 +231,37 @@ class Diffusion:
             )
         return indices[0][0]
 
-    def _check_consistency(self, warn_threshold: float = 0.7):
-        """
-        Compare the fitted gradient against an ordinary least squares estimate of the same data.
-
-        The generalised least squares fit performed by :py:func:`bayesian_regression` weights the
-        observations by the inverse of an estimated covariance matrix. Where sampling noise has
-        made that matrix numerically singular, the inversion can return a gradient in error by
-        several orders of magnitude without any other indication of failure.
-
-        An ordinary least squares fit to the same observations does not use the covariance and so
-        cannot be affected in the same way. It is a less precise estimator, but a robust one, and
-        a large disagreement between the two is evidence that the covariance is unreliable rather
-        than that the data are unusual.
-
-        :param warn_threshold: The ratio of the fitted gradient to the ordinary least squares
-            gradient below which a warning is raised. Optional, default is :py:attr:`0.7`.
-        """
-        if getattr(self, '_ols_gradient', None) is None or self._ols_gradient <= 0:
-            return
-
-        ratio = np.median(self.gradient.values) / self._ols_gradient
-        self._consistency_ratio = ratio
-
-        if ratio < warn_threshold:
-            warnings.warn(
-                f'The fitted gradient is {ratio:.3f} times the ordinary least squares estimate. '
-                'A ratio this low indicates that the covariance matrix may be numerically '
-                'singular and that the diffusion coefficient may be unreliable. Consider '
-                'refitting with recondition=True, or inspecting the eigenvalues of '
-                'Diffusion.covariance_matrix.',
-                UserWarning,
-                stacklevel=3,
-            )
-
     @property
     def consistency_ratio(self) -> float:
         """
-        The ratio of the fitted gradient to an ordinary least squares estimate of the same data.
+        The ratio of the median fitted gradient to an ordinary least squares estimate of the same straight
+        line, with or without an intercept as fitted.
 
-        A value near unity indicates the two estimators agree. A value well below unity indicates
-        that the covariance-weighted fit has been affected by a numerically singular covariance
-        matrix. :py:attr:`None` if the check has not been run.
+        This is for information only: how far the ratio can stray from unity by chance depends on the
+        noise in the data, so the warning raised by the consistency check uses :py:attr:`consistency_z`
+        instead. :py:attr:`None` if the check has not been run or the ordinary least squares gradient is
+        not positive.
 
         :return: The ratio of the two gradient estimates.
         """
         return getattr(self, '_consistency_ratio', None)
+
+    @property
+    def consistency_z(self) -> float:
+        """
+        The difference between the generalised and ordinary least squares gradients of the fitted data,
+        divided by the standard deviation of that difference expected from the covariance matrix.
+
+        If the covariance matrix is correct and a straight line describes the data, this follows approximately
+        a standard normal distribution, so a magnitude well above three indicates that the covariance matrix
+        is unreliable, that the fitted time intervals extend outside the diffusive regime, or that an
+        intercept is needed but not fitted. Zero if the two estimators coincide (for example, for a straight
+        line through two points), :py:attr:`nan` if the covariance matrix is too close to singular for the
+        statistic to be computed, and :py:attr:`None` if the check has not been run.
+
+        :return: The consistency statistic.
+        """
+        return getattr(self, '_consistency_z', None)
 
     def _diffusion(self, start_dt: sc.Variable, **kwargs):
         """
@@ -487,3 +501,136 @@ def _straight_line(abscissa: np.ndarray, gradient: float, intercept: float = 0.0
     :return: The resulting ordinate.
     """
     return gradient * abscissa + intercept
+
+
+def _gradient_estimates(
+    abscissa: np.ndarray, ordinate: np.ndarray, covariance: np.ndarray, fit_intercept: bool = True
+) -> tuple[float, float, float, float]:
+    """
+    Estimate the gradient of a straight line by generalised and by ordinary least squares, together
+    with the variance of each estimate under the given covariance matrix.
+
+    The generalised least squares estimate uses the same pseudo-inverse of the covariance matrix as
+    the likelihood in :py:func:`Diffusion.bayesian_regression`. If the normal matrix formed with that
+    pseudo-inverse is exactly singular (in practice, only when every eigenvalue of the covariance matrix
+    is discarded), the generalised least squares gradient is :py:attr:`nan` and its variance is infinite.
+    A normal matrix that is nearly singular instead gives a very large or negative variance, which
+    :py:func:`_check_consistency` detects.
+
+    :param abscissa: The abscissa data.
+    :param ordinate: The ordinate data.
+    :param covariance: The covariance matrix of the ordinate data.
+    :param fit_intercept: Whether the straight line has an intercept. Optional, default is :py:attr:`True`.
+
+    :return: The generalised least squares gradient, the ordinary least squares gradient, and the
+        variances of the generalised and ordinary least squares gradients.
+    """
+    if fit_intercept:
+        design = np.column_stack([abscissa, np.ones_like(abscissa)])
+    else:
+        design = abscissa[:, np.newaxis]
+
+    ols_inverse = np.linalg.inv(design.T @ design)
+    ols_gradient = (ols_inverse @ design.T @ ordinate)[0]
+    ols_variance = (ols_inverse @ design.T @ covariance @ design @ ols_inverse)[0, 0]
+
+    weights = pinvh(covariance)
+    try:
+        gls_inverse = np.linalg.inv(design.T @ weights @ design)
+    except np.linalg.LinAlgError:
+        return np.nan, ols_gradient, np.inf, ols_variance
+    gls_gradient = (gls_inverse @ design.T @ weights @ ordinate)[0]
+    gls_variance = gls_inverse[0, 0]
+
+    return gls_gradient, ols_gradient, gls_variance, ols_variance
+
+
+def _check_consistency(
+    gls_gradient: float, ols_gradient: float, gls_variance: float, ols_variance: float, z_threshold: float = 3.0
+) -> float:
+    """
+    Check that the generalised least squares gradient agrees with the ordinary least squares gradient of
+    the same data, to within the noise expected from the covariance matrix, and warn if it does not.
+
+    The check computes the statistic z = (g_GLS - g_OLS) / sqrt(Var_OLS - Var_GLS), where g_GLS and g_OLS
+    are the two gradients and Var_GLS and Var_OLS are their sampling variances, both evaluated with the
+    estimated covariance matrix C used in the fit (see :py:func:`_gradient_estimates`).
+
+    For a design matrix X, Var_GLS = [(X^T C^+ X)^-1]_00, where C^+ is the pseudo-inverse of C, and
+    Var_OLS = [(X^T X)^-1 X^T C X (X^T X)^-1]_00. Var_OLS is the variance of the OLS gradient for data
+    correlated as described by C. It is not the textbook OLS standard error sigma^2 (X^T X)^-1, which
+    assumes uncorrelated data and is far too small for mean-squared displacements.
+
+    The check is needed because the generalised least squares fit performed by
+    :py:func:`Diffusion.bayesian_regression` weights the observations by the inverse of C. Where sampling
+    noise has made C numerically singular, the inversion can return a gradient in error by several orders of
+    magnitude, in either direction, without any other indication of failure. An ordinary least squares fit
+    does not invert C and so cannot fail in the same way.
+
+    If C is correct, both gradients are unbiased and the generalised least squares gradient has a sampling
+    variance no larger than that of the ordinary least squares gradient. The variance of their difference is
+    then Var_OLS - Var_GLS, so z follows approximately a standard normal distribution (a Hausman test). This
+    is exact only for normally distributed data with a known covariance matrix that the pseudo-inverse
+    inverts exactly; estimating C from the same data widens the distribution somewhat. A large value of
+    abs(z) is therefore evidence that C is unreliable, or that a straight line does not describe the data
+    over the fitted time intervals (for example, if these begin before the diffusive regime or an intercept
+    is needed but not fitted), rather than that the data are unusual.
+
+    :param gls_gradient: The generalised least squares gradient.
+    :param ols_gradient: The ordinary least squares gradient.
+    :param gls_variance: The variance of the generalised least squares gradient.
+    :param ols_variance: The variance of the ordinary least squares gradient.
+    :param z_threshold: The magnitude of z above which a warning is raised. Optional, default
+        is :py:attr:`3.0`.
+
+    :return: The statistic z. This is zero if the two variances are equal to within rounding, when the two
+        estimators coincide (for example, for a straight line through two points) and so cannot disagree,
+        :py:attr:`nan` if C is too close to singular for its pseudo-inverse, and not finite if either
+        gradient is not finite.
+
+    :warns UserWarning: If abs(z) is larger than :py:attr:`z_threshold`; if Var_GLS is not positive or is
+        larger than Var_OLS by more than rounding, neither of which can arise from an exact inverse of C, so
+        that C is too close to singular for its pseudo-inverse; or if either gradient is not finite.
+    """
+    advice = 'Consider refitting with recondition=True, or inspecting the eigenvalues of Diffusion.covariance_matrix.'
+
+    # Rounding leaves a relative difference of order 1e-10 between the variances of estimators that coincide.
+    difference = ols_variance - gls_variance
+    tolerance = 1e-8 * ols_variance
+
+    if not gls_variance > 0 or not difference > -tolerance:
+        warnings.warn(
+            'The generalised least squares gradient has a larger variance than the ordinary least squares '
+            'gradient, or a variance that is not positive, which is impossible for a well-conditioned '
+            'covariance matrix. The covariance matrix is too close to singular for its pseudo-inverse to be '
+            f'reliable, and the diffusion coefficient may be unreliable. {advice}',
+            UserWarning,
+            stacklevel=3,
+        )
+        return np.nan
+
+    if difference <= tolerance:
+        return 0.0
+
+    z = (gls_gradient - ols_gradient) / np.sqrt(difference)
+
+    if not np.isfinite(z):
+        warnings.warn(
+            'The generalised or ordinary least squares gradient is not finite, so the consistency of the fit '
+            f'could not be checked. {advice}',
+            UserWarning,
+            stacklevel=3,
+        )
+    elif abs(z) > z_threshold:
+        warnings.warn(
+            f'The generalised least squares gradient differs from the ordinary least squares estimate by '
+            f'{abs(z):.1f} times the spread expected from the noise in the data (z = {z:.2f}). A difference '
+            'this large indicates that the covariance matrix may be unreliable, or that a straight line does '
+            'not describe the data from start_dt onwards, and that the diffusion coefficient may be wrong. '
+            'Consider a later start_dt, refitting with recondition=True, or inspecting the eigenvalues of '
+            'Diffusion.covariance_matrix.',
+            UserWarning,
+            stacklevel=3,
+        )
+
+    return z
