@@ -15,5 +15,4 @@ arrhenius_t
 yeh_hummer
 pymatgen
 mdanalysis
-condition_number
 ```
